@@ -7,16 +7,16 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
   },
   "dependencies": {
-    "bcryptjs": "latest",
-    "cors": "latest",
-    "dotenv": "latest",
-    "express": "latest",
-    "jsonwebtoken": "latest",
-    "mysql2": "latest",
-    "socket.io": "latest"
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.15.3",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
-    "jest": "latest",
-    "supertest": "latest"
+    "jest": "^30.2.0",
+    "supertest": "^7.1.4"
   }
 }
