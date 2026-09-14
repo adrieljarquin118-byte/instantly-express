@@ -4,7 +4,6 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npm --prefix backend run start",
     "healthcheckPath": "/api/salud",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
