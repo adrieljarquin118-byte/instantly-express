@@ -1,0 +1,9 @@
+{
+  "name": "instantly-express",
+  "private": true,
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:web": "npm --prefix web run dev",
+    "install:all": "npm install --prefix backend && npm install --prefix web && npm install --prefix mobile"
+  }
+}

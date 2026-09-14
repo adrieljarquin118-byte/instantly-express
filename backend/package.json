@@ -1,0 +1,22 @@
+{
+  "name": "instantly-express-backend",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
+  },
+  "dependencies": {
+    "bcryptjs": "latest",
+    "cors": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "jsonwebtoken": "latest",
+    "mysql2": "latest",
+    "socket.io": "latest"
+  },
+  "devDependencies": {
+    "jest": "latest",
+    "supertest": "latest"
+  }
+}

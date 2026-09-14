@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Instantly Express",
+    "slug": "instantly-express",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "../assets/isotipo-512.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "../assets/logo-completo-640.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F2F5F9"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "71de33ab-b7cf-4b93-9755-46f9eff70dfe"
+      }
+    },
+    "android": {
+      "package": "com.josecalles.instantlyexpress"
+    }
+  }
+}

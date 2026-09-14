@@ -1,0 +1,8 @@
+{
+  "name": "instantly-express-web",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "vite build" },
+  "dependencies": { "@vitejs/plugin-react": "latest", "axios": "latest", "socket.io-client": "latest", "vite": "latest", "react": "latest", "react-dom": "latest", "lucide-react": "latest", "jspdf": "latest" },
+  "devDependencies": {}
+}
