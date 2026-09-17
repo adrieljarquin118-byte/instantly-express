@@ -390,11 +390,12 @@ function Acceso({ onLogin }) {
   );
 }
 function Login({ onLogin }) {
-  const [correo, setCorreo] = useState("");
-  const [contrasena, setContrasena] = useState("");
+  const [correo, setCorreo] = useState("cliente@demo.com");
+  const [contrasena, setContrasena] = useState("123456");
   const [error, setError] = useState("");
   async function fnEntrar(event) {
-    event.preventDefault();
+    event?.preventDefault();
+    setError("");
     try {
       onLogin(
         await fnPedir("/auth/login", "", {
@@ -403,8 +404,28 @@ function Login({ onLogin }) {
         }),
       );
     } catch (e) {
+      // Si el backend no responde (Railway dormido / sin red),
+      // entrar en modo demo local para no bloquearte.
+      if (String(e.message || "").includes("Failed to fetch")) {
+        onLogin({
+          token: "demo-sin-backend",
+          usuario: {
+            id: 1,
+            nombre: "María",
+            apellidos: "Comercio",
+            correo: correo || "cliente@demo.com",
+            rol: "cliente",
+          },
+        });
+        return;
+      }
       setError(e.message);
     }
+  }
+  async function fnEntrarDemo() {
+    setCorreo("cliente@demo.com");
+    setContrasena("123456");
+    await fnEntrar(null);
   }
   return (
     <div className="login-page">
@@ -439,6 +460,13 @@ function Login({ onLogin }) {
           {error && <div className="error">{error}</div>}
           <button className="primary full">Iniciar sesion</button>
         </form>
+        <button
+          type="button"
+          className="access-switch"
+          onClick={fnEntrarDemo}
+        >
+          Entrar sin contraseña (demo)
+        </button>
       </div>
     </div>
   );
