@@ -439,17 +439,39 @@ header {
   box-shadow: 0 10px 30px #00e5ff10;
 }
 .product-art {
+  position: relative;
+  overflow: hidden;
   height: 150px;
-  background: linear-gradient(135deg, var(--accent), #10151e 70%);
-  padding: 16px;
-  display: flex;
-  justify-content: space-between;
-  color: #081017;
+  background: #10151e;
+  padding: 0;
+  display: block;
+  color: #fff;
   font: 700 10px "JetBrains Mono";
 }
-.product-art strong {
-  font: 700 58px "Space Grotesk";
-  opacity: 0.4;
+.product-foto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.product-art-overlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 30px 14px 12px;
+  background: linear-gradient(transparent, #000000d9);
+}
+.product-art-overlay span,
+.product-art-overlay strong {
+  border: 1px solid #ffffff52;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #0b0e14a8;
+  font-size: 10px;
 }
 .product-body {
   padding: 17px;
@@ -1310,6 +1332,27 @@ header {
   color: #081017;
   font: 700 74px "Space Grotesk";
   margin-bottom: 22px;
+  overflow: hidden;
+}
+.detail-art-foto {
+  padding: 0;
+}
+.detail-main-foto {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+.mini-art-foto {
+  padding: 0;
+  overflow: hidden;
+}
+.mini-foto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 6px;
 }
 .detail-modal h2 {
   font: 600 24px "Space Grotesk";

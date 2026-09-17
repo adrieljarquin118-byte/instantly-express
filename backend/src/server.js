@@ -45,6 +45,8 @@ const productos = [
     minimo: 5,
     stock: 86,
     color: "#00E5FF",
+    imagen:
+      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=60",
     descripcion:
       "Acceso mayorista para catálogos digitales y campañas de contenido.",
   },
@@ -57,6 +59,8 @@ const productos = [
     minimo: 3,
     stock: 31,
     color: "#FF7A1A",
+    imagen:
+      "https://images.unsplash.com/photo-1498049794561-7780e7231661?auto=format&fit=crop&w=800&q=60",
     descripcion: "Kit compacto para creadores y vitrinas comerciales.",
   },
   {
@@ -68,6 +72,8 @@ const productos = [
     minimo: 4,
     stock: 18,
     color: "#39FF6A",
+    imagen:
+      "https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&w=800&q=60",
     descripcion: "Presentación premium para oficinas, eventos y escaparates.",
   },
   {
@@ -79,6 +85,8 @@ const productos = [
     minimo: 10,
     stock: 120,
     color: "#FFC93C",
+    imagen:
+      "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=800&q=60",
     descripcion:
       "Selección de accesorios de alta rotación para venta minorista.",
   },
@@ -91,6 +99,8 @@ const productos = [
     minimo: 1,
     stock: 999,
     color: "#B991FF",
+    imagen:
+      "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=60",
     descripcion: "Gestión de campañas digitales para lanzamientos comerciales.",
   },
   {
@@ -102,6 +112,8 @@ const productos = [
     minimo: 5,
     stock: 44,
     color: "#FF4757",
+    imagen:
+      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=60",
     descripcion: "Audio cerrado para streaming, edición y monitoreo.",
   },
 ];

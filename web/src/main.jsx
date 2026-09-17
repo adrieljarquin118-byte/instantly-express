@@ -3,11 +3,48 @@ import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
 import "./styles.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:4010/api";
-const logo = new URL("../../assets/logo-completo-640.png", import.meta.url)
-  .href;
-const iso = new URL("../../assets/isotipo-192.png", import.meta.url).href;
-const placeholderJpg = logo;
+const API = (
+  import.meta.env.VITE_API_URL || "http://localhost:4010/api"
+).replace(/\/$/, "");
+const logo = "/logo.png";
+const portadaLogin = "/portada.png";
+const iso = "/logo.png";
+const placeholderJpg = "/portada.png";
+const IMAGEN_POR_DEFECTO =
+  "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=800&q=60";
+function fnImagenProducto(item) {
+  if (item?.imagen) return item.imagen;
+  const categoria = String(item?.categoria || "").toLowerCase();
+  if (categoria.includes("stream")) return IMAGENES_DEMO.streaming;
+  if (categoria.includes("electr")) return IMAGENES_DEMO.electronica;
+  if (categoria.includes("fisico") || categoria.includes("físico"))
+    return IMAGENES_DEMO.fisico;
+  if (
+    categoria.includes("ropa") ||
+    categoria.includes("accesor") ||
+    categoria.includes("urbano")
+  )
+    return IMAGENES_DEMO.ropa;
+  if (categoria.includes("serv")) return IMAGENES_DEMO.servicios;
+  return IMAGEN_POR_DEFECTO;
+}
+function ImagenSegura({ src, alt, className }) {
+  const [origen, setOrigen] = useState(src || IMAGEN_POR_DEFECTO);
+  useEffect(() => {
+    setOrigen(src || IMAGEN_POR_DEFECTO);
+  }, [src]);
+  return (
+    <img
+      src={origen}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => {
+        if (origen !== IMAGEN_POR_DEFECTO) setOrigen(IMAGEN_POR_DEFECTO);
+      }}
+    />
+  );
+}
 function Icono({ children }) {
   return <span className="icon-box">{children}</span>;
 }
@@ -58,6 +95,93 @@ const traducciones = {
     perfil: "Perfil",
   },
 };
+const IMAGENES_DEMO = {
+  streaming:
+    "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=60",
+  electronica:
+    "https://images.unsplash.com/photo-1498049794561-7780e7231661?auto=format&fit=crop&w=800&q=60",
+  fisico:
+    "https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&w=800&q=60",
+  ropa: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=800&q=60",
+  servicios:
+    "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=60",
+};
+const CATALOGO_DEMO = [
+  {
+    id: 1,
+    nombre: "Catálogo Stream Premium",
+    proveedor: "Nube Media",
+    categoria: "Streaming",
+    precio: 18.5,
+    minimo: 5,
+    stock: 86,
+    color: "#00E5FF",
+    imagen: IMAGENES_DEMO.streaming,
+    descripcion:
+      "Acceso mayorista para catálogos digitales y campañas de contenido.",
+  },
+  {
+    id: 2,
+    nombre: "Kit de iluminación LED",
+    proveedor: "Volt Supply",
+    categoria: "Electrónica",
+    precio: 42,
+    minimo: 3,
+    stock: 31,
+    color: "#FF7A1A",
+    imagen: IMAGENES_DEMO.electronica,
+    descripcion: "Kit compacto para creadores y vitrinas comerciales.",
+  },
+  {
+    id: 3,
+    nombre: "Arreglo floral corporativo",
+    proveedor: "Flora Norte",
+    categoria: "Producto físico",
+    precio: 26.9,
+    minimo: 4,
+    stock: 18,
+    color: "#39FF6A",
+    imagen: IMAGENES_DEMO.fisico,
+    descripcion: "Presentación premium para oficinas, eventos y escaparates.",
+  },
+  {
+    id: 4,
+    nombre: "Pack de accesorios urbanos",
+    proveedor: "Distrito 9",
+    categoria: "Ropa y accesorios",
+    precio: 11.75,
+    minimo: 10,
+    stock: 120,
+    color: "#FFC93C",
+    imagen: IMAGENES_DEMO.ropa,
+    descripcion:
+      "Selección de accesorios de alta rotación para venta minorista.",
+  },
+  {
+    id: 5,
+    nombre: "Servicio de pauta digital",
+    proveedor: "Nube Media",
+    categoria: "Servicios",
+    precio: 75,
+    minimo: 1,
+    stock: 999,
+    color: "#B991FF",
+    imagen: IMAGENES_DEMO.servicios,
+    descripcion: "Gestión de campañas digitales para lanzamientos comerciales.",
+  },
+  {
+    id: 6,
+    nombre: "Audífonos de estudio",
+    proveedor: "Volt Supply",
+    categoria: "Electrónica",
+    precio: 29.9,
+    minimo: 5,
+    stock: 44,
+    color: "#FF4757",
+    imagen: IMAGENES_DEMO.electronica,
+    descripcion: "Audio cerrado para streaming, edición y monitoreo.",
+  },
+];
 
 function fnEscaparPdf(texto) {
   return String(texto)
@@ -143,9 +267,26 @@ function App() {
   const [productoDetalle, setProductoDetalle] = useState(null);
 
   useEffect(() => {
+    setProductos(CATALOGO_DEMO);
     fnPedir("/productos", token)
-      .then(setProductos)
-      .catch((error) => setAviso(error.message));
+      .then((datos) => {
+        if (Array.isArray(datos) && datos.length > 0) {
+          setProductos(
+            datos.map((item) => ({
+              ...item,
+              imagen: item.imagen || fnImagenProducto(item),
+            }))
+          );
+          setAviso("");
+        }
+      })
+      .catch((error) => {
+        if (String(error.message || "").includes("Failed to fetch"))
+          setAviso(
+            "Sin conexión al backend: mostrando catálogo demo. Revisa VITE_API_URL en Railway."
+          );
+        else setAviso(error.message);
+      });
   }, [token]);
   useEffect(() => {
     if (!token) return undefined;
@@ -720,8 +861,15 @@ function Catalogo({ productos, agregar, detalle }) {
               className="product-art"
               style={{ "--accent": producto.color || "#00E5FF" }}
             >
-              <span>{producto.categoria.slice(0, 3).toUpperCase()}</span>
-              <strong>IE</strong>
+              <ImagenSegura
+                src={fnImagenProducto(producto)}
+                alt={producto.nombre}
+                className="product-foto"
+              />
+              <div className="product-art-overlay">
+                <span>{producto.categoria.slice(0, 3).toUpperCase()}</span>
+                <strong>{producto.proveedor}</strong>
+              </div>
             </div>
             <div className="product-body">
               <div className="product-meta">
@@ -766,11 +914,12 @@ function DetalleProducto({ producto, agregar, cerrar }) {
         <button className="close-register" onClick={cerrar}>
           <X size={20} />
         </button>
-        <div
-          className="detail-art"
-          style={{ background: producto.color || "#00E5FF" }}
-        >
-          IE
+        <div className="detail-art detail-art-foto">
+          <ImagenSegura
+            src={fnImagenProducto(producto)}
+            alt={producto.nombre}
+            className="detail-main-foto"
+          />
         </div>
         <p className="eyebrow">DETALLE DE PRODUCTO</p>
         <h2>{producto.nombre}</h2>
@@ -826,11 +975,12 @@ function Carrito({ carrito, productos, confirmar }) {
           <div className="panel cart-list">
             {lineas.map((linea) => (
               <div className="cart-line" key={linea.idDetalle}>
-                <div
-                  className="mini-art"
-                  style={{ background: linea.producto.color }}
-                >
-                  IE
+                <div className="mini-art mini-art-foto">
+                  <ImagenSegura
+                    src={fnImagenProducto(linea.producto)}
+                    alt={linea.producto.nombre}
+                    className="mini-foto"
+                  />
                 </div>
                 <div>
                   <strong>{linea.producto.nombre}</strong>
