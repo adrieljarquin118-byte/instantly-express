@@ -399,7 +399,7 @@ function Login({ onLogin }) {
       onLogin(
         await fnPedir("/auth/login", "", {
           method: "POST",
-          body: JSON.stringify({ correo, contraseña }),
+          body: JSON.stringify({ correo, contrasena }),
         }),
       );
     } catch (e) {
