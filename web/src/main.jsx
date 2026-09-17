@@ -4,7 +4,8 @@ import { io } from "socket.io-client";
 import "./styles.css";
 
 const API = (
-  import.meta.env.VITE_API_URL || "http://localhost:4010/api"
+  import.meta.env.VITE_API_URL ||
+  "https://instantly-express-production.up.railway.app/api"
 ).replace(/\/$/, "");
 const logo = "/logo.png";
 const portadaLogin = "/portada.png";
@@ -536,14 +537,18 @@ function Login({ onLogin }) {
     event.preventDefault();
     setError("");
     try {
-      onLogin(
-        await fnPedir("/auth/login", "", {
-          method: "POST",
-          body: JSON.stringify({ correo, contrasena }),
-        }),
-      );
+      const datos = await fnPedir("/auth/login", "", {
+        method: "POST",
+        body: JSON.stringify({ correo, contrasena }),
+      });
+      onLogin(datos);
     } catch (e) {
-      setError(e.message);
+      const mensaje = String(e.message || "");
+      if (mensaje.includes("Failed to fetch"))
+        setError(
+          `No se pudo conectar a ${API}/auth/login. Revisa que VITE_API_URL sea https://instantly-express-production.up.railway.app/api y haz Redeploy de la web.`
+        );
+      else setError(mensaje || "No se pudo iniciar sesión");
     }
   }
   return (
