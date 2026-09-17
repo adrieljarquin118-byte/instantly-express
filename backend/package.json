@@ -1,7 +1,7 @@
 {
   "name": "instantly-express-backend",
   "type": "module",
-  "engines": { "node": "20.x" },
+  "engines": { "node": "22.x" },
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
