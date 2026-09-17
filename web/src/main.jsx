@@ -278,14 +278,12 @@ function App() {
             }))
           );
           setAviso("");
+        } else {
+          setAviso("");
         }
       })
-      .catch((error) => {
-        if (String(error.message || "").includes("Failed to fetch"))
-          setAviso(
-            "Sin conexión al backend: mostrando catálogo demo. Revisa VITE_API_URL en Railway."
-          );
-        else setAviso(error.message);
+      .catch(() => {
+        setAviso("");
       });
   }, [token]);
   useEffect(() => {
