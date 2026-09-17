@@ -251,9 +251,17 @@ async function fnPedir(ruta, token, opciones = {}) {
 
 function App() {
   const [usuario, setUsuario] = useState(
-    JSON.parse(localStorage.getItem("ie_usuario") || "null"),
+    JSON.parse(localStorage.getItem("ie_usuario") || "null") || {
+      id: 1,
+      nombre: "María",
+      apellidos: "Comercio",
+      correo: "cliente@demo.com",
+      rol: "cliente",
+    }
   );
-  const [token, setToken] = useState(localStorage.getItem("ie_token") || "");
+  const [token, setToken] = useState(
+    localStorage.getItem("ie_token") || "libre"
+  );
   const [vista, setVista] = useState("inicio");
   const [productos, setProductos] = useState([]);
   const [carrito, setCarrito] = useState([]);
@@ -288,7 +296,7 @@ function App() {
       });
   }, [token]);
   useEffect(() => {
-    if (!token) return undefined;
+    if (!token || token === "libre") return undefined;
     fnPedir("/carrito", token)
       .then(setCarrito)
       .catch(() => {});
@@ -300,14 +308,14 @@ function App() {
     socket.on("disconnect", () => setEnVivo(false));
     socket.on("carrito:actualizado", (evento) =>
       setAviso(
-        `Existencias actualizadas: ${evento.stockDisponible} disponibles`,
-      ),
+        `Existencias actualizadas: ${evento.stockDisponible} disponibles`
+      )
     );
     socket.on("pedido:actualizado", (pedido) =>
       setPedidos((actuales) => [
         pedido,
         ...actuales.filter((item) => item.id !== pedido.id),
-      ]),
+      ])
     );
     return () => socket.disconnect();
   }, [token]);
@@ -319,6 +327,28 @@ function App() {
     localStorage.setItem("ie_usuario", JSON.stringify(datos.usuario));
   }
   async function fnAgregar(producto) {
+    if (!token || token === "libre") {
+      setCarrito((actual) => {
+        const linea = actual.find((item) => item.idProducto === producto.id);
+        if (linea)
+          return actual.map((item) =>
+            item.idProducto === producto.id
+              ? { ...item, cantidad: item.cantidad + producto.minimo }
+              : item
+          );
+        return [
+          ...actual,
+          {
+            idDetalle: `libre-${producto.id}-${Date.now()}`,
+            idProducto: producto.id,
+            cantidad: producto.minimo,
+            producto,
+          },
+        ];
+      });
+      setAviso(`${producto.nombre} agregado al carrito`);
+      return;
+    }
     try {
       setCarrito(
         await fnPedir("/carrito/agregar", token, {
@@ -335,6 +365,39 @@ function App() {
     }
   }
   async function fnConfirmar(metodoPago = "Transferencia bancaria") {
+    if (!token || token === "libre") {
+      if (carrito.length === 0) {
+        setAviso("El carrito está vacío");
+        return;
+      }
+      const total = carrito.reduce(
+        (suma, linea) => suma + linea.producto.precio * linea.cantidad,
+        0
+      );
+      const pedido = {
+        id: `IE-${Date.now().toString().slice(-6)}`,
+        fecha: new Date().toISOString().slice(0, 10),
+        estado: "pendiente",
+        progreso: 10,
+        total,
+        destino: "San Salvador",
+        envio: "Express",
+        metodoPago:
+          [
+            "Tarjeta",
+            "Transferencia bancaria",
+            "Pago contra entrega",
+          ].includes(metodoPago) || typeof metodoPago === "string"
+            ? metodoPago
+            : "Transferencia bancaria",
+      };
+      setPedidos((actuales) => [pedido, ...actuales]);
+      setCarrito([]);
+      fnDescargarFactura(pedido);
+      setVista("pedidos");
+      setAviso("Pedido creado en modo libre. La factura PDF se descargó.");
+      return;
+    }
     try {
       const elegido = [
         "Tarjeta",
@@ -362,8 +425,15 @@ function App() {
   }
   function fnSalir() {
     localStorage.clear();
-    setToken("");
-    setUsuario(null);
+    setToken("libre");
+    setUsuario({
+      id: 1,
+      nombre: "María",
+      apellidos: "Comercio",
+      correo: "cliente@demo.com",
+      rol: "cliente",
+    });
+    setVista("inicio");
   }
   function fnCambiarTema(nuevoTema) {
     setTema(nuevoTema);
@@ -378,7 +448,13 @@ function App() {
     vista === "seguimiento" && <SeguimientoInteractivo pedidos={pedidos} />;
   }
 
-  if (!token) return <Acceso onLogin={fnSesion} />;
+  const usuarioActivo = usuario || {
+    id: 1,
+    nombre: "María",
+    apellidos: "Comercio",
+    correo: "cliente@demo.com",
+    rol: "cliente",
+  };
   const filtrados = productos.filter((item) =>
     `${item.nombre} ${item.proveedor} ${item.categoria}`
       .toLowerCase()
@@ -443,12 +519,12 @@ function App() {
             />
           </div>
           <div className="user">
-            <span className="avatar">{usuario.nombre[0]}</span>
+            <span className="avatar">{usuarioActivo.nombre[0]}</span>
             <div>
-              <strong>{usuario.nombre}</strong>
-              <small>{usuario.rol}</small>
+              <strong>{usuarioActivo.nombre}</strong>
+              <small>{usuarioActivo.rol} · libre</small>
             </div>
-            <button className="logout" onClick={fnSalir} title="Cerrar sesion">
+            <button className="logout" onClick={fnSalir} title="Restablecer demo">
               <LogOut size={17} />
             </button>
           </div>
@@ -461,7 +537,7 @@ function App() {
         )}
         <section className="content">
           {vista === "inicio" && (
-            <Inicio usuario={usuario} pedidos={pedidos} ir={setVista} />
+            <Inicio usuario={usuarioActivo} pedidos={pedidos} ir={setVista} />
           )}
           {vista === "catalogo" && (
             <Catalogo
@@ -481,7 +557,7 @@ function App() {
           {vista === "seguimiento" && <Seguimiento pedidos={pedidos} />}
           {vista === "perfil" && (
             <Perfil
-              usuario={usuario}
+              usuario={usuarioActivo}
               tema={tema}
               cambiarTema={fnCambiarTema}
               idioma={idioma}
