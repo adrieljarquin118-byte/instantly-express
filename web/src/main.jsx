@@ -461,6 +461,24 @@ function App() {
     localStorage.setItem("ie_token", datos.token);
     localStorage.setItem("ie_usuario", JSON.stringify(datos.usuario));
   }
+  function fnSesionLibre(correoLibre = "") {
+    const correoFinal = String(correoLibre || "").trim() || "cliente@demo.com";
+    const nombreFinal = correoFinal.includes("@") ? correoFinal.split("@")[0] : "Invitado";
+    const datos = {
+      token: "libre",
+      usuario: {
+        id: 1,
+        nombre: nombreFinal || "Invitado",
+        apellidos: "Comercio",
+        correo: correoFinal,
+        rol: "cliente",
+      },
+    };
+    setToken("libre");
+    setUsuario(datos.usuario);
+    localStorage.setItem("ie_token", "libre");
+    localStorage.setItem("ie_usuario", JSON.stringify(datos.usuario));
+  }
   async function fnAgregar(producto) {
     if (!token || token === "libre") {
       setCarrito((actual) => {
@@ -596,6 +614,10 @@ function App() {
       .includes(busqueda.toLowerCase()),
   );
   const idiomaActual = traducciones[idioma] || traducciones.es;
+  const sesionIniciada = Boolean(token && token !== "libre");
+  if (!sesionIniciada) {
+    return <Acceso onLogin={fnSesion} onLibre={fnSesionLibre} />;
+  }
   const menu = [
     ["inicio", idiomaActual.inicio],
     ["catalogo", idiomaActual.catalogo],
@@ -713,12 +735,12 @@ function App() {
   );
 }
 
-function Acceso({ onLogin }) {
+function Acceso({ onLogin, onLibre }) {
   const [mostrarRegistro, setMostrarRegistro] = useState(false);
   const [mostrarRecuperacion, setMostrarRecuperacion] = useState(false);
   return (
     <div>
-      <Login onLogin={onLogin} />
+      <Login onLogin={onLogin} onLibre={onLibre} />
       <button
         className="forgot-link"
         onClick={() => setMostrarRecuperacion(true)}
@@ -740,13 +762,17 @@ function Acceso({ onLogin }) {
     </div>
   );
 }
-function Login({ onLogin }) {
+function Login({ onLogin, onLibre }) {
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] = useState("");
   const [error, setError] = useState("");
   async function fnEntrar(event) {
     event.preventDefault();
     setError("");
+    if (!String(contrasena || "").trim()) {
+      onLibre(correo);
+      return;
+    }
     try {
       const datos = await fnPedir("/auth/login", "", {
         method: "POST",
@@ -784,16 +810,24 @@ function Login({ onLogin }) {
             />
           </label>
           <label className="login-field password-field">
-            Contraseña
+            Contraseña (opcional: vacio entra libre)
             <input
-              required
               type="password"
               value={contrasena}
               onChange={(e) => setContrasena(e.target.value)}
+              placeholder="Dejala vacia para entrar libre"
             />
           </label>
           {error && <div className="error">{error}</div>}
           <button className="primary full">Iniciar sesion</button>
+          <button
+            type="button"
+            className="ghost full"
+            style={{ marginTop: 8 }}
+            onClick={() => onLibre(correo)}
+          >
+            Entrar libre sin contraseña
+          </button>
         </form>
       </div>
     </div>
