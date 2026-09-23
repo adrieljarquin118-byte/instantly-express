@@ -850,7 +850,7 @@ function App() {
       .includes(busqueda.toLowerCase()),
   );
   const idiomaActual = traducciones[idioma] || traducciones.es;
-  const sesionIniciada = Boolean(token && token !== "libre");
+  const sesionIniciada = Boolean(token);
   if (!sesionIniciada) {
     return (
       <>
