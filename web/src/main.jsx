@@ -1176,19 +1176,12 @@ function Acceso({ onLogin, onLibre }) {
   const [mostrarRecuperacion, setMostrarRecuperacion] = useState(false);
   return (
     <div>
-      <Login onLogin={onLogin} onLibre={onLibre} />
-      <button
-        className="forgot-link"
-        onClick={() => setMostrarRecuperacion(true)}
-      >
-        ¿Olvidaste tu contraseña?
-      </button>
-      <button
-        className="access-switch"
-        onClick={() => setMostrarRegistro(true)}
-      >
-        Crear una cuenta
-      </button>
+      <Login
+        onLogin={onLogin}
+        onLibre={onLibre}
+        alRecuperar={() => setMostrarRecuperacion(true)}
+        alRegistrar={() => setMostrarRegistro(true)}
+      />
       {mostrarRegistro && (
         <Registro onLogin={onLogin} cerrar={() => setMostrarRegistro(false)} />
       )}
@@ -1198,7 +1191,7 @@ function Acceso({ onLogin, onLibre }) {
     </div>
   );
 }
-function Login({ onLogin, onLibre }) {
+function Login({ onLogin, onLibre, alRecuperar, alRegistrar }) {
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] = useState("");
   const [error, setError] = useState("");
@@ -1264,6 +1257,15 @@ function Login({ onLogin, onLibre }) {
           >
             Entrar libre sin contraseña
           </button>
+          <div className="login-links">
+            <button type="button" className="forgot-link" onClick={alRecuperar}>
+              ¿Olvidaste tu contraseña?
+            </button>
+            <span className="login-links-sep" aria-hidden="true" />
+            <button type="button" className="access-switch" onClick={alRegistrar}>
+              Crear una cuenta
+            </button>
+          </div>
         </form>
       </div>
     </div>

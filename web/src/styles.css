@@ -1001,13 +1001,6 @@ header {
     padding: 14px 45px;
   }
 }
-.access-switch {
-  display: block;
-  margin: -10px auto 0;
-  background: transparent;
-  color: var(--cyan);
-  font-size: 12px;
-}
 .register-layer {
   position: fixed;
   inset: 0;
@@ -1755,17 +1748,46 @@ header {
 .password-field {
   margin-top: 14px;
 }
-.forgot-link {
-  display: block;
-  margin: 22px auto 10px;
+.login-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.login-links-sep {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #3a4256;
+}
+.forgot-link,
+.access-switch {
   background: transparent;
+  padding: 2px 2px 3px;
+  font: 500 14px "Space Grotesk";
+  letter-spacing: 0.2px;
+  transition: 0.15s;
+}
+.forgot-link {
   color: var(--muted);
-  font-size: 12px;
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-underline-offset: 4px;
 }
 .forgot-link:hover {
   color: var(--cyan);
+}
+.access-switch {
+  color: var(--cyan);
+}
+.access-switch:hover {
+  color: #7ff0ff;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .success-message {
   color: var(--green);
