@@ -423,13 +423,14 @@ function fnEscaparPdf(texto) {
     .replace(/\(/g, "\\(")
     .replace(/\)/g, "\\)");
 }
-function fnDescargarFactura(pedido, opciones = {}) {
+function fnDescargarFactura(pedido, opciones = {}, usuarioFactura = null) {
   const lineas = Array.isArray(opciones.lineas)
     ? opciones.lineas : Array.isArray(pedido.lineas) ? pedido.lineas : [];
-  const cliente = opciones.cliente || pedido.cliente || {};
-  const nombreCliente = cliente.nombre || pedido.clienteNombre || "Oscar Enrique Perez Ticas";
-  const telefonoCliente = cliente.telefono || pedido.telefono || "+503 6997-4095";
-  const correoCliente = cliente.correo || pedido.correo || "oscarperez@gmail.com";
+  const cliente = opciones.cliente || pedido.cliente || usuarioFactura || {};
+  const nombreBase = [cliente.nombre, cliente.apellidos].filter(Boolean).join(" ").trim();
+  const nombreCliente = nombreBase || pedido.clienteNombre || "Cliente";
+  const telefonoCliente = cliente.telefono || pedido.telefono || "+503 0000-0000";
+  const correoCliente = cliente.correo || pedido.correo || "cliente@demo.com";
   const metodo = String(pedido.metodoPago || opciones.metodoPago || "Transferencia bancaria").toLowerCase();
   const esEfectivo = metodo.includes("efectivo") || metodo.includes("cash");
   const esTarjeta = metodo.includes("tarjeta") || metodo.includes("card");
@@ -624,7 +625,7 @@ function App() {
     }
   );
   const [token, setToken] = useState(
-    localStorage.getItem("ie_token") || "libre"
+    localStorage.getItem("ie_token") || ""
   );
   const [vista, setVista] = useState("inicio");
   const [productos, setProductos] = useState([]);
@@ -782,7 +783,11 @@ function App() {
       };
       setPedidos((actuales) => [pedido, ...actuales]);
       setCarrito([]);
-      fnDescargarFactura(pedido);
+      fnDescargarFactura(pedido, {
+        lineas: carrito,
+        cliente: usuarioActivo,
+        metodoPago,
+      }, usuarioActivo);
       setVista("pedidos");
       setAviso("Pedido creado en modo libre. La factura PDF se descargó.");
       return;
@@ -805,7 +810,10 @@ function App() {
       });
       setPedidos((actuales) => [pedido, ...actuales]);
       setCarrito([]);
-      fnDescargarFactura(pedido);
+      fnDescargarFactura(pedido, {
+        cliente: usuarioActivo,
+        metodoPago: elegido,
+      }, usuarioActivo);
       setVista("pedidos");
       setAviso("Pedido creado. La factura PDF se descargó.");
     } catch (error) {
@@ -814,7 +822,7 @@ function App() {
   }
   function fnSalir() {
     localStorage.clear();
-    setToken("libre");
+    setToken("");
     setUsuario({
       id: 1,
       nombre: "María",

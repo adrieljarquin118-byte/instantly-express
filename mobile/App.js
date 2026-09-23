@@ -129,6 +129,28 @@ function App() {
   const [carrito, setCarrito] = useState([]);
   const [pedidos, setPedidos] = useState([]);
   const [conectado, setConectado] = useState(false);
+  async function fnFacturaMovil(pedido, usuarioActual = {}) {
+    const nombre = [usuarioActual?.nombre, usuarioActual?.apellidos].filter(Boolean).join(" ").trim() || "Cliente";
+    const correo = usuarioActual?.correo || "cliente@demo.com";
+    const fecha = pedido?.fecha || new Date().toISOString().slice(0, 10);
+    const total = Number(pedido?.total || 0).toFixed(2);
+    const html = `<html><body style="font-family:Arial;padding:24px">
+      <h1 style="color:#1b3a5f">INSTANTLY EXPRESS</h1>
+      <h2>FACTURA ${pedido?.id || ""}</h2>
+      <p><b>Cliente:</b> ${nombre}<br/><b>Correo:</b> ${correo}<br/><b>Fecha:</b> ${fecha}<br/><b>Metodo:</b> ${pedido?.metodoPago || "Efectivo"}</p>
+      <p><b>Total a pagar: $${total}</b></p>
+      <p>------- GRACIAS POR SU COMPRA -------</p>
+    </body></html>`;
+    try {
+      const Print = require("expo-print");
+      const Sharing = require("expo-sharing");
+      const archivo = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(archivo.uri);
+      else Alert.alert("Factura lista", archivo.uri);
+    } catch (e) {
+      Alert.alert("Factura", `No se pudo generar el PDF: ${e.message}`);
+    }
+  }
   async function pedir(ruta, opciones = {}) {
     if (!sesion?.token || sesion.token === "libre")
       throw new Error("Modo libre: sin backend");
@@ -288,7 +310,7 @@ function App() {
           )}
         </Tab.Screen>
         <Tab.Screen name="Pedidos">
-          {() => <Pedidos pedidos={pedidos} />}
+          {() => <Pedidos pedidos={pedidos} usuario={sesion.usuario} onFactura={(item) => fnFacturaMovil(item, sesion.usuario)} />}
         </Tab.Screen>
         <Tab.Screen name="Perfil">
           {() => (
@@ -305,7 +327,23 @@ function App() {
 function Login({ onLogin }) {
   const [correo, setCorreo] = useState("cliente@demo.com");
   const [contrasena, setContrasena] = useState("123456");
+  const [cargando, setCargando] = useState(false);
+  function entrarLibre() {
+    const correoFinal = String(correo || "").trim() || "cliente@demo.com";
+    const nombreFinal = correoFinal.includes("@") ? correoFinal.split("@")[0] : "Invitado";
+    onLogin({
+      token: "libre",
+      usuario: { id: 1, nombre: nombreFinal || "Invitado", apellidos: "Comercio", correo: correoFinal, rol: "cliente" },
+    });
+  }
   async function entrar() {
+    if (!String(contrasena || "").trim()) {
+      entrarLibre();
+      return;
+    }
+    setCargando(true);
+    // Animación del logo grande que se oscurece y desaparece (igual que web, ~2.4s).
+    setTimeout(() => setCargando(false), 2400);
     try {
       const respuesta = await fetch(`${API}/auth/login`, {
         method: "POST",
@@ -342,16 +380,28 @@ function Login({ onLogin }) {
           onChangeText={setCorreo}
           autoCapitalize="none"
         />
-        <Text style={styles.label}>Contraseña</Text>
+        <Text style={styles.label}>Contraseña (opcional: vacia entra libre)</Text>
         <TextInput
           style={styles.input}
           value={contrasena}
           onChangeText={setContrasena}
           secureTextEntry
+          placeholder="Dejala vacia para entrar libre"
+          placeholderTextColor={colores.secundario}
         />
         <Pressable style={styles.primary} onPress={entrar}>
           <Text style={styles.primaryText}>Iniciar sesión →</Text>
         </Pressable>
+        <Pressable style={styles.secondary} onPress={entrarLibre}>
+          <Text style={styles.secondaryText}>Entrar libre sin contraseña</Text>
+        </Pressable>
+        {cargando ? (
+          <View style={styles.splash}>
+            <Image source={placeholderJpg} style={styles.splashLogo} resizeMode="contain" />
+            <ActivityIndicator size="large" color={colores.cian} style={{ marginTop: 18 }} />
+            <Text style={styles.splashText}>Cargando tu red comercial...</Text>
+          </View>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -551,7 +601,7 @@ function Carrito({ carrito, productos, confirmar }) {
     </SafeAreaView>
   );
 }
-function Pedidos({ pedidos }) {
+function Pedidos({ pedidos, usuario, onFactura }) {
   return (
     <SafeAreaView style={styles.safe}>
       <FlatList
@@ -578,6 +628,10 @@ function Pedidos({ pedidos }) {
                 style={[styles.progressFill, { width: `${item.progreso}%` }]}
               />
             </View>
+            <Text style={styles.muted}>Total: ${Number(item.total || 0).toFixed(2)}</Text>
+            <Pressable style={styles.smallButton} onPress={() => onFactura(item)}>
+              <Text style={styles.smallButtonText}>Descargar factura PDF</Text>
+            </Pressable>
           </View>
         )}
       />{" "}
@@ -828,4 +882,17 @@ const styles = StyleSheet.create({
     height: 62,
     paddingBottom: 6,
   },
+  splash: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#05070C",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+  },
+  splashLogo: { width: 220, height: 220, borderRadius: 18 },
+  splashText: { color: colores.texto, marginTop: 12, fontWeight: "700" },
 });
