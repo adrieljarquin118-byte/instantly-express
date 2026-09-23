@@ -177,58 +177,134 @@ function fnDestinoPedido(destino) {
   if (d.includes("panama")) return { lat: 8.9824, lng: -79.5199, nombre: "Panama" };
   return { lat: 13.6929, lng: -89.2182, nombre: "San Salvador" };
 }
-function fnPosCamion(origen, destino, progreso) {
-  const t = Math.min(0.98, Math.max(0.02, Number(progreso || 0) / 100));
-  return { lat: origen.lat + (destino.lat - origen.lat) * t, lng: origen.lng + (destino.lng - origen.lng) * t };
+// Punto sobre la ruta ortodromica (gran circulo) entre A y B; avance de 0 a 1.
+function fnPuntoGeodesico(a, b, avance) {
+  const f = Math.min(1, Math.max(0, Number(avance) || 0));
+  const rad = Math.PI / 180;
+  const lat1 = a.lat * rad;
+  const lng1 = a.lng * rad;
+  const lat2 = b.lat * rad;
+  const lng2 = b.lng * rad;
+  const d = 2 * Math.asin(
+    Math.sqrt(
+      Math.pow(Math.sin((lat2 - lat1) / 2), 2) +
+        Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lng2 - lng1) / 2), 2),
+    ),
+  );
+  if (!d) return { lat: a.lat, lng: a.lng };
+  const pa = Math.sin((1 - f) * d) / Math.sin(d);
+  const pb = Math.sin(f * d) / Math.sin(d);
+  const x = pa * Math.cos(lat1) * Math.cos(lng1) + pb * Math.cos(lat2) * Math.cos(lng2);
+  const y = pa * Math.cos(lat1) * Math.sin(lng1) + pb * Math.cos(lat2) * Math.sin(lng2);
+  const z = pa * Math.sin(lat1) + pb * Math.sin(lat2);
+  return {
+    lat: (Math.atan2(z, Math.hypot(x, y)) * 180) / Math.PI,
+    lng: (Math.atan2(y, x) * 180) / Math.PI,
+  };
 }
-// Traza ruta rapido en zoom y luego se aleja al conectar con el destino.
-function RutaAnimada({ origen, destino, progreso, modo, relieve3d }) {
+// Recorrido A -> B densificado sobre el gran circulo, listo para trazarse.
+function fnPuntosRuta(origen, destino, tramos) {
+  const total = Math.max(2, Math.floor(tramos || 160));
+  const puntos = [];
+  for (let i = 0; i <= total; i += 1) {
+    puntos.push(fnPuntoGeodesico(origen, destino, i / total));
+  }
+  return puntos;
+}
+// Avance 0..1 que traza el recorrido completo; se reinicia cuando cambia la llave.
+function useTrazoRecorrido(llave, duracion) {
+  const [avance, setAvance] = useState(0);
+  useEffect(() => {
+    setAvance(0);
+    const tiempo = Math.max(400, duracion || 5200);
+    const inicio = performance.now();
+    let cuadro = 0;
+    let ultimo = 0;
+    const paso = (ahora) => {
+      const t = Math.min(1, (ahora - inicio) / tiempo);
+      const valor = Math.round(t * 100) / 100;
+      if (valor !== ultimo) {
+        ultimo = valor;
+        setAvance(valor);
+      }
+      if (t < 1) cuadro = requestAnimationFrame(paso);
+    };
+    cuadro = requestAnimationFrame(paso);
+    return () => cancelAnimationFrame(cuadro);
+  }, [llave, duracion]);
+  return avance;
+}
+// Traza la ruta A -> B mientras el camion avanza; la camara acompana el recorrido.
+function RutaAnimada({ origen, destino, avance, modo, relieve3d }) {
   const mapa = useMap();
-  const rutaRef = React.useRef(null);
-  const lineaRef = React.useRef(null);
+  const puntos = React.useMemo(
+    () => fnPuntosRuta(origen, destino, 160),
+    [origen.lat, origen.lng, destino.lat, destino.lng],
+  );
+  const planRef = React.useRef(null);
+  const trazoRef = React.useRef(null);
+  const avanceRef = React.useRef(0);
+  avanceRef.current = avance;
+  const llave = pedidoKey(origen, destino);
+  // 1) Ruta completa (cian = ruta planificada) + recorrido trazado (verde).
   React.useEffect(() => {
-    if (!mapa || !window.google) return;
-    if (!rutaRef.current) {
-      rutaRef.current = new window.google.maps.Polyline({
-        path: [origen, destino],
+    if (!mapa || !window.google || puntos.length < 2) return;
+    const extremos = [puntos[0], puntos[puntos.length - 1]];
+    if (!planRef.current) {
+      planRef.current = new window.google.maps.Polyline({
+        path: extremos,
         geodesic: true,
         strokeColor: "#00E5FF",
-        strokeOpacity: 0.95,
-        strokeWeight: 4,
+        strokeOpacity: 0.45,
+        strokeWeight: 3,
       });
-      rutaRef.current.setMap(mapa);
+      planRef.current.setMap(mapa);
     } else {
-      rutaRef.current.setPath([origen, destino]);
+      planRef.current.setPath(extremos);
     }
-    if (!lineaRef.current) {
-      lineaRef.current = new window.google.maps.Polyline({
-        path: [origen, fnPosCamion(origen, destino, progreso)],
+    if (!trazoRef.current) {
+      trazoRef.current = new window.google.maps.Polyline({
+        path: [puntos[0], puntos[1]],
         geodesic: true,
         strokeColor: "#39FF6A",
         strokeOpacity: 1,
         strokeWeight: 5,
       });
-      lineaRef.current.setMap(mapa);
-    } else {
-      lineaRef.current.setPath([origen, fnPosCamion(origen, destino, progreso)]);
+      trazoRef.current.setMap(mapa);
     }
-    return () => {};
-  }, [mapa, origen.lat, origen.lng, destino.lat, destino.lng, progreso]);
+    return () => {
+      if (planRef.current) planRef.current.setMap(null);
+      if (trazoRef.current) trazoRef.current.setMap(null);
+      planRef.current = null;
+      trazoRef.current = null;
+    };
+  }, [mapa, llave, puntos]);
+  // 2) La linea verde se dibuja de A hacia B: su punta es la posicion del camion.
+  React.useEffect(() => {
+    if (!trazoRef.current || puntos.length < 2) return;
+    const total = puntos.length - 1;
+    const corte = Math.floor(Math.min(1, Math.max(0, avance)) * total);
+    const tramo = puntos.slice(0, Math.max(1, corte + 1));
+    if (corte < total) tramo.push(fnPuntoGeodesico(origen, destino, avance));
+    trazoRef.current.setPath(tramo);
+  }, [avance, puntos, origen.lat, origen.lng, destino.lat, destino.lng]);
   // Secuencia cine: zoom rapido al origen -> panea al camion -> zoom-out para ver ruta completa.
   React.useEffect(() => {
     if (!mapa) return;
     const inclinar3d = relieve3d !== false && modo === "satellite";
-    mapa.setTilt(inclinar3d ? 45 : 0);
+    try {
+      mapa.setTilt(inclinar3d ? 45 : 0);
+    } catch {}
     try {
       mapa.setHeading(inclinar3d ? 25 : 0);
     } catch {}
     const timers = [];
     // 1) Zoom rapido al origen
     try { mapa.setZoom(11); mapa.panTo(origen); } catch {}
-    // 2) Conectar con el camion (punto intermedio en movimiento)
+    // 2) Seguir al camion (punta del trazo, en movimiento)
     timers.push(setTimeout(() => {
       try {
-        mapa.panTo(fnPosCamion(origen, destino, progreso));
+        mapa.panTo(fnPuntoGeodesico(origen, destino, avanceRef.current));
         mapa.setZoom(7);
       } catch {}
     }, 900));
@@ -242,11 +318,31 @@ function RutaAnimada({ origen, destino, progreso, modo, relieve3d }) {
       } catch {}
     }, 2200));
     return () => timers.forEach(clearTimeout);
-  }, [mapa, modo, relieve3d, pedidoKey(origen, destino)]);
+  }, [mapa, modo, relieve3d, llave, origen.lat, origen.lng, destino.lat, destino.lng]);
   return null;
 }
 function pedidoKey(origen, destino) {
   return `${origen.lat},${origen.lng}-${destino.lat},${destino.lng}`;
+}
+// Barra del recorrido: muestra el trazo de A a B y su porcentaje.
+function TrazoRecorrido({ origen, destino, avance, completa }) {
+  const trazado = Math.round(Math.min(1, Math.max(0, avance)) * 100);
+  const completo = avance >= 1;
+  return (
+    <div className="mapa-trazo">
+      <div className="mapa-trazo-cabecera">
+        <span>{completo ? "Recorrido completo" : "Trazando ruta A -> B"}</span>
+        <strong>{trazado}%</strong>
+      </div>
+      <div className="mapa-trazo-track">
+        <i style={{ width: `${trazado}%` }} />
+      </div>
+      <p className="mapa-trazo-pie">
+        {origen.nombre} → {destino.nombre}
+        {completo && completa ? " · llegada confirmada" : ""}
+      </p>
+    </div>
+  );
 }
 function fnFotoVariada(grupo, id) {
   const lista = FOTOS_CATALOGO[grupo] || [IMAGEN_POR_DEFECTO];
@@ -1880,21 +1976,32 @@ function SeguimientoInteractivo({ pedidos }) {
   return <MapaGoogle pedido={pedido} pedidoReal={pedidoReal} />;
 }
 
+// Elige el mapa real de Google o el respaldo con teselas cuando falta la clave.
 function MapaGoogle({ pedido, pedidoReal }) {
+  if (!GOOGLE_MAPS_API_KEY) {
+    return <MapaRespaldo pedido={pedido} pedidoReal={pedidoReal} />;
+  }
+  return <MapaConGoogle pedido={pedido} pedidoReal={pedidoReal} />;
+}
+
+function MapaConGoogle({ pedido, pedidoReal }) {
   const origen = ORIGEN_RUTA;
   const destino = fnDestinoPedido(pedido.destino);
-  const camion = fnPosCamion(origen, destino, pedido.progreso);
   const [modo, setModo] = useState("roadmap");
   const [trafico, setTrafico] = useState(true);
   const [relieve3d, setRelieve3d] = useState(true);
   const [replay, setReplay] = useState(0);
+  // El recorrido se traza solo de A a B cada vez que cambia el pedido o se repite.
+  const avance = useTrazoRecorrido(
+    `${pedido.id}-${replay}-${pedidoKey(origen, destino)}`,
+    5600,
+  );
+  const camion = fnPuntoGeodesico(origen, destino, avance);
+  const trazado = Math.round(avance * 100);
   const centroMedio = {
     lat: (origen.lat + destino.lat) / 2,
     lng: (origen.lng + destino.lng) / 2,
   };
-  if (!GOOGLE_MAPS_API_KEY) {
-    return <MapaRespaldo pedido={pedido} pedidoReal={pedidoReal} />;
-  }
   return (
     <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
       <>
@@ -1903,8 +2010,8 @@ function MapaGoogle({ pedido, pedidoReal }) {
             <p className="eyebrow">SEGUIMIENTO EN TIEMPO REAL</p>
             <h1>Ubicacion del paquete</h1>
             <p className="muted">
-              Google Maps: zoom rapido al origen, conecta con el camion y se
-              aleja a la ruta completa.
+              Google Maps: zoom rapido al origen, sigue al camion y traza la
+              linea completa hasta el destino.
             </p>
           </div>
           <span className="date-chip">
@@ -1947,42 +2054,53 @@ function MapaGoogle({ pedido, pedidoReal }) {
                 3D {relieve3d ? "ON" : "OFF"}
               </button>
               <button onClick={() => setReplay((r) => r + 1)}>
-                Repetir vuelo
+                Repetir recorrido
               </button>
             </div>
-            <Map
-              key={`${pedido.id}-${replay}`}
-              mapId={MAP_ID_DEMO}
-              defaultCenter={centroMedio}
-              defaultZoom={5}
-              mapTypeId={modo}
-              gestureHandling="greedy"
-              className="real-map"
-            >
-              <CapaTrafico activa={trafico} />
-              <RutaAnimada
-                origen={origen}
-                destino={destino}
-                progreso={pedido.progreso}
-                modo={modo}
-                relieve3d={relieve3d}
-              />
-              <AdvancedMarker position={origen} title={origen.nombre}>
-                <Pin background="#00E5FF" borderColor="#062b36" glyphColor="#062b36" />
-              </AdvancedMarker>
-              <AdvancedMarker position={destino} title={destino.nombre}>
-                <Pin background="#39FF6A" borderColor="#062b36" glyphColor="#062b36" />
-              </AdvancedMarker>
-              <AdvancedMarker position={camion} title={`Camion ${pedido.progreso}%`}>
-                <div className="truck-marker">Camion {pedido.progreso}%</div>
-              </AdvancedMarker>
-            </Map>
+            <div className="mapa-lienzo">
+              <Map
+                key={`${pedido.id}-${replay}`}
+                mapId={MAP_ID_DEMO}
+                defaultCenter={centroMedio}
+                defaultZoom={5}
+                mapTypeId={modo}
+                gestureHandling="greedy"
+                className="real-map"
+              >
+                <CapaTrafico activa={trafico} />
+                <RutaAnimada
+                  origen={origen}
+                  destino={destino}
+                  avance={avance}
+                  modo={modo}
+                  relieve3d={relieve3d}
+                />
+                <AdvancedMarker position={origen} title={origen.nombre}>
+                  <Pin background="#00E5FF" borderColor="#062b36" glyphColor="#062b36" />
+                </AdvancedMarker>
+                <AdvancedMarker position={destino} title={destino.nombre}>
+                  <Pin background="#39FF6A" borderColor="#062b36" glyphColor="#062b36" />
+                </AdvancedMarker>
+                <AdvancedMarker
+                  position={camion}
+                  title={avance >= 1 ? `Camion en ${destino.nombre}` : `Camion ${trazado}%`}
+                >
+                  <div className="truck-marker">
+                    {avance >= 1
+                      ? `Camion en ${destino.nombre}`
+                      : `Camion ${trazado}%`}
+                  </div>
+                </AdvancedMarker>
+              </Map>
+              <TrazoRecorrido origen={origen} destino={destino} avance={avance} />
+            </div>
             <div className="map-status">
               <Package size={15} />{" "}
               {pedidoReal
                 ? `Paquete ${pedido.progreso}% en ruta`
                 : "Vista de previsualizacion"}{" "}
-              · Origen: {origen.nombre} · Destino: {destino.nombre}
+              · Trazo A → B {trazado}% · Origen: {origen.nombre} · Destino:{" "}
+              {destino.nombre}
             </div>
         </div>
         <aside className="panel tracking-summary">
@@ -2025,11 +2143,137 @@ function CapaTrafico({ activa }) {
   return null;
 }
 
+// ==== Respaldo sin clave: teselas OpenStreetMap dibujadas dentro de un SVG ====
+const TESELA = 256;
+const URL_TESELA = "https://tile.openstreetmap.org";
+const ZOOM_TESELAS = { min: 3, max: 8 };
+// Proyeccion Web Mercator ("slippy map"): lat/lng -> pixeles del mundo.
+function fnProyectarTesela(punto, zoom) {
+  const escala = TESELA * Math.pow(2, zoom);
+  const rad = (Math.max(-85, Math.min(85, punto.lat)) * Math.PI) / 180;
+  return {
+    x: ((punto.lng + 180) / 360) * escala,
+    y: ((1 - Math.log(Math.tan(Math.PI / 4 + rad / 2)) / Math.PI) / 2) * escala,
+  };
+}
+// Vista (viewBox) centrada en la ruta y teselas que cubren el panel.
+function fnVistaTeselas(puntos, zoom, ancho, alto) {
+  const proyectados = puntos.map((punto) => fnProyectarTesela(punto, zoom));
+  const xs = proyectados.map((punto) => punto.x);
+  const ys = proyectados.map((punto) => punto.y);
+  const x0 = (Math.min(...xs) + Math.max(...xs)) / 2 - ancho / 2;
+  const y0 = (Math.min(...ys) + Math.max(...ys)) / 2 - alto / 2;
+  const mundo = Math.pow(2, zoom);
+  const teselas = [];
+  const ultimaY = Math.min(mundo - 1, Math.floor((y0 + alto) / TESELA));
+  for (let ty = Math.max(0, Math.floor(y0 / TESELA)); ty <= ultimaY; ty += 1) {
+    for (let tx = Math.floor(x0 / TESELA); tx <= Math.floor((x0 + ancho) / TESELA); tx += 1) {
+      if (tx < 0 || tx >= mundo) continue;
+      teselas.push({
+        clave: `${zoom}-${tx}-${ty}`,
+        url: `${URL_TESELA}/${zoom}/${tx}/${ty}.png`,
+        x: tx * TESELA,
+        y: ty * TESELA,
+      });
+    }
+  }
+  return { x0, y0, teselas, proyectados };
+}
+// Zoom mas cercano en el que el recorrido entra en el panel; se deja margen
+// arriba (barra de herramientas) y abajo (barra del trazo) para que los pines
+// de origen y destino siempre queden visibles.
+function fnZoomAjustado(puntos, ancho, alto) {
+  for (let z = ZOOM_TESELAS.max; z > ZOOM_TESELAS.min; z -= 1) {
+    const inicio = fnProyectarTesela(puntos[0], z);
+    const fin = fnProyectarTesela(puntos[puntos.length - 1], z);
+    if (
+      Math.abs(fin.y - inicio.y) <= alto * 0.58 &&
+      Math.abs(fin.x - inicio.x) <= ancho * 0.58
+    ) {
+      return z;
+    }
+  }
+  return ZOOM_TESELAS.min;
+}
+// Largo total del trazo ya proyectado a pixeles.
+function fnLargoTrazo(puntos) {
+  let total = 0;
+  for (let i = 1; i < puntos.length; i += 1) {
+    total += Math.hypot(puntos[i].x - puntos[i - 1].x, puntos[i].y - puntos[i - 1].y);
+  }
+  return total;
+}
+// Punto del camion sobre el trazo segun el avance 0..1.
+function fnPuntoEnTrazo(puntos, avance, largo) {
+  const meta = largo * Math.min(1, Math.max(0, avance));
+  let recorrido = 0;
+  for (let i = 1; i < puntos.length; i += 1) {
+    const segmento = Math.hypot(puntos[i].x - puntos[i - 1].x, puntos[i].y - puntos[i - 1].y);
+    if (recorrido + segmento >= meta) {
+      const t = segmento ? (meta - recorrido) / segmento : 0;
+      return {
+        x: puntos[i - 1].x + (puntos[i].x - puntos[i - 1].x) * t,
+        y: puntos[i - 1].y + (puntos[i].y - puntos[i - 1].y) * t,
+      };
+    }
+    recorrido += segmento;
+  }
+  return puntos[puntos.length - 1];
+}
+function fnTrazadoSvg(puntos) {
+  return puntos
+    .map((punto, i) => `${i ? "L" : "M"}${punto.x.toFixed(1)} ${punto.y.toFixed(1)}`)
+    .join(" ");
+}
 function MapaRespaldo({ pedido, pedidoReal }) {
-  const [zoom, setZoom] = useState(5);
+  const origen = ORIGEN_RUTA;
+  const destino = fnDestinoPedido(pedido.destino);
+  const [zoomFijo, setZoomFijo] = useState(0); // 0 = ajuste automatico al recorrido
   const [recargar, setRecargar] = useState(0);
-  const mapa =
-    "https://www.openstreetmap.org/export/embed.html?bbox=-120%2C10%2C-65%2C45&layer=mapnik";
+  const [medida, setMedida] = useState({ ancho: 960, alto: 520 });
+  const panelRef = React.useRef(null);
+  // El recorrido se traza solo de A a B (y se repite con el boton del panel).
+  const avance = useTrazoRecorrido(
+    `${pedido.id}-${recargar}-${pedidoKey(origen, destino)}`,
+    5600,
+  );
+  // Mide el panel para calcular la ventana de mapa y el zoom justos.
+  React.useEffect(() => {
+    const nodo = panelRef.current;
+    if (!nodo || typeof ResizeObserver === "undefined") return;
+    const medir = () => {
+      const caja = nodo.getBoundingClientRect();
+      setMedida({
+        ancho: Math.max(320, Math.round(caja.width)),
+        alto: Math.max(240, Math.round(caja.height)),
+      });
+    };
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(nodo);
+    return () => observador.disconnect();
+  }, []);
+  const puntos = React.useMemo(
+    () => fnPuntosRuta(origen, destino, 160),
+    [origen.lat, origen.lng, destino.lat, destino.lng],
+  );
+  const zoom = zoomFijo || fnZoomAjustado(puntos, medida.ancho, medida.alto);
+  const vista = fnVistaTeselas(puntos, zoom, medida.ancho, medida.alto);
+  const largo = fnLargoTrazo(vista.proyectados);
+  const camion = fnPuntoEnTrazo(vista.proyectados, avance, largo);
+  const trazado = Math.round(avance * 100);
+  const inicio = vista.proyectados[0];
+  const fin = vista.proyectados[vista.proyectados.length - 1];
+  const etiquetaCamion =
+    avance >= 1 ? `Camion en ${destino.nombre}` : `Camion ${trazado}%`;
+  const anchoEtiqueta = 18 + etiquetaCamion.length * 6.4;
+  const izquierda = camion.x + 20 + anchoEtiqueta > vista.x0 + medida.ancho;
+  const fichaX = izquierda ? -anchoEtiqueta - 20 : 20;
+  // Si la etiqueta del pin no cabe a la derecha, se dibuja hacia la izquierda.
+  const cabeDerecha = (punto, texto) =>
+    punto.x + 12 + 16 + texto.length * 6.6 <= vista.x0 + medida.ancho;
+  const origenDerecha = cabeDerecha(inicio, origen.nombre);
+  const destinoDerecha = cabeDerecha(fin, destino.nombre);
   return (
     <>
       <div className="page-heading">
@@ -2037,7 +2281,8 @@ function MapaRespaldo({ pedido, pedidoReal }) {
           <p className="eyebrow">SEGUIMIENTO EN TIEMPO REAL</p>
           <h1>Ubicacion del paquete</h1>
           <p className="muted">
-            Sin clave Google Maps: usa mapa de respaldo OpenStreetMap.
+            Sin clave Google Maps: mapa de respaldo OpenStreetMap con el
+            recorrido trazado de A a B.
           </p>
         </div>
         <span className="date-chip">
@@ -2048,32 +2293,104 @@ function MapaRespaldo({ pedido, pedidoReal }) {
         <div className="panel map-panel map-interactive">
           <div className="map-toolbar">
             <button
-              onClick={() => setZoom((actual) => Math.min(18, actual + 1))}
+              title="Acercar"
+              onClick={() => setZoomFijo(Math.min(ZOOM_TESELAS.max, zoom + 1))}
             >
               +
             </button>
             <button
-              onClick={() => setZoom((actual) => Math.max(2, actual - 1))}
+              title="Alejar"
+              onClick={() => setZoomFijo(Math.max(ZOOM_TESELAS.min, zoom - 1))}
             >
               -
             </button>
-            <button onClick={() => setRecargar((actual) => actual + 1)}>
-              Actualizar
+            <button title="Ver el recorrido completo" onClick={() => setZoomFijo(0)}>
+              Ajustar
             </button>
-            <span>Nivel {zoom}</span>
+            <button onClick={() => setRecargar((actual) => actual + 1)}>
+              Repetir recorrido
+            </button>
+            <span>
+              Zoom {zoom} · Trazo {trazado}%
+            </span>
           </div>
-          <iframe
-            key={recargar}
-            title="Mapa interactivo de seguimiento"
-            src={mapa}
-            className="real-map"
-          />
+          <div className="real-map real-map-teselas" ref={panelRef}>
+            <svg
+              className="mapa-svg"
+              viewBox={`${vista.x0} ${vista.y0} ${medida.ancho} ${medida.alto}`}
+            >
+              {vista.teselas.map((tesela) => (
+                <image
+                  key={tesela.clave}
+                  href={tesela.url}
+                  x={tesela.x}
+                  y={tesela.y}
+                  width={TESELA}
+                  height={TESELA}
+                />
+              ))}
+              <path className="mapa-ruta" d={fnTrazadoSvg(vista.proyectados)} />
+              <path
+                className="mapa-trazo-linea"
+                d={fnTrazadoSvg(vista.proyectados)}
+                strokeDasharray={`${largo.toFixed(1)}`}
+                strokeDashoffset={`${(largo * (1 - avance)).toFixed(1)}`}
+              />
+              <circle className="mapa-pin mapa-pin-origen" cx={inicio.x} cy={inicio.y} r={7} />
+              <text
+                className="mapa-etiqueta"
+                x={inicio.x + (origenDerecha ? 12 : -12)}
+                y={inicio.y + 4}
+                style={{ textAnchor: origenDerecha ? "start" : "end" }}
+              >
+                {origen.nombre}
+              </text>
+              <circle className="mapa-pin mapa-pin-destino" cx={fin.x} cy={fin.y} r={7} />
+              <text
+                className="mapa-etiqueta"
+                x={fin.x + (destinoDerecha ? 12 : -12)}
+                y={fin.y + 4}
+                style={{ textAnchor: destinoDerecha ? "start" : "end" }}
+              >
+                {destino.nombre}
+              </text>
+              <g transform={`translate(${camion.x.toFixed(1)} ${camion.y.toFixed(1)})`}>
+                <circle className="mapa-camion-halo" r={10} />
+                <circle className="mapa-camion-punto" r={5.5} />
+                <rect
+                  className="mapa-camion-ficha"
+                  x={fichaX}
+                  y={-11}
+                  width={anchoEtiqueta}
+                  height={22}
+                  rx={11}
+                />
+                <text
+                  className="mapa-camion-texto"
+                  x={fichaX + anchoEtiqueta / 2}
+                  y={4}
+                >
+                  {etiquetaCamion}
+                </text>
+              </g>
+            </svg>
+            <a
+              className="mapa-creditos"
+              href="https://www.openstreetmap.org/copyright"
+              target="_blank"
+              rel="noreferrer"
+            >
+              © OpenStreetMap
+            </a>
+            <TrazoRecorrido origen={origen} destino={destino} avance={avance} />
+          </div>
           <div className="map-status">
             <Package size={15} />{" "}
             {pedidoReal
               ? `Paquete ${pedido.progreso}% en ruta`
               : "Vista de previsualizacion"}{" "}
-            · Origen: {ORIGEN_RUTA.nombre} · Destino: {fnDestinoPedido(pedido.destino).nombre}
+            · Trazo A → B {trazado}% · Origen: {origen.nombre} · Destino:{" "}
+            {destino.nombre}
           </div>
         </div>
         <aside className="panel tracking-summary">

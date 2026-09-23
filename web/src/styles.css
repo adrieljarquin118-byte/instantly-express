@@ -1556,6 +1556,151 @@ header {
   white-space: nowrap;
   box-shadow: 0 6px 16px #00000059;
 }
+.real-map-teselas {
+  position: relative;
+  overflow: hidden;
+  background: #0b0e14;
+}
+.mapa-lienzo {
+  position: relative;
+}
+.mapa-svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mapa-ruta {
+  fill: none;
+  stroke: #00e5ff;
+  stroke-opacity: 0.55;
+  stroke-width: 2.5;
+  stroke-dasharray: 9 7;
+}
+.mapa-trazo-linea {
+  fill: none;
+  stroke: #39ff6a;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px #39ff6acc);
+  transition: stroke-dashoffset 140ms linear;
+}
+.mapa-pin {
+  stroke: #062b36;
+  stroke-width: 2.5;
+}
+.mapa-pin-origen {
+  fill: #00e5ff;
+}
+.mapa-pin-destino {
+  fill: #39ff6a;
+}
+.mapa-etiqueta {
+  fill: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-anchor: start;
+  paint-order: stroke;
+  stroke: #0b0e14;
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+}
+.mapa-camion-halo {
+  fill: #ffd16640;
+  stroke: #ffd166a1;
+  stroke-width: 1.5;
+}
+.mapa-camion-punto {
+  fill: #ffd166;
+  stroke: #18242b;
+  stroke-width: 2;
+}
+.mapa-camion-ficha {
+  fill: #ffd166;
+  stroke: #18242b;
+  stroke-width: 1.5;
+}
+.mapa-camion-texto {
+  fill: #18242b;
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+.mapa-creditos {
+  position: absolute;
+  right: 14px;
+  bottom: 6px;
+  z-index: 3;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  text-decoration: none;
+  text-shadow: 0 1px 3px #0b0e14, 0 0 6px #0b0e14;
+}
+.mapa-trazo {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 24px;
+  z-index: 3;
+  padding: 10px 12px;
+  background: #0b0e14e0;
+  border: 1px solid #00e5ff5c;
+  border-radius: 8px;
+}
+.mapa-trazo-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #cfe7ee;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.mapa-trazo-cabecera strong {
+  color: #39ff6a;
+  font-size: 12px;
+}
+.mapa-trazo-track {
+  margin-top: 7px;
+  height: 5px;
+  border-radius: 999px;
+  background: #ffffff26;
+  overflow: hidden;
+}
+.mapa-trazo-track i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #00e5ff, #39ff6a);
+  transition: width 140ms linear;
+}
+.mapa-trazo-pie {
+  margin: 7px 0 0;
+  color: #8fa6ae;
+  font-size: 11px;
+}
+.tema-claro .mapa-trazo {
+  background: #fff;
+  border-color: #0b0e142e;
+}
+.tema-claro .mapa-trazo-cabecera {
+  color: #47535a;
+}
+.tema-claro .mapa-trazo-pie {
+  color: #6b7880;
+}
+.tema-claro .mapa-creditos {
+  color: #18242b;
+  text-shadow: 0 1px 3px #fff, 0 0 6px #fff;
+}
+.tema-claro .mapa-etiqueta {
+  fill: #0b0e14;
+  stroke: #ffffff;
+}
 .tema-claro .map-toolbar button {
   background: #fffffff0;
   color: #0b0e14;
