@@ -3,6 +3,13 @@ import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  APIProvider,
+  Map,
+  AdvancedMarker,
+  Pin,
+  useMap,
+} from "@vis.gl/react-google-maps";
 import "./styles.css";
 
 const API = (
@@ -156,6 +163,91 @@ const FOTOS_CATALOGO = {
     "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=800&q=60",
   ],
 };
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+const MAP_ID_DEMO = "DEMO_MAP_ID";
+// Origen: Miami USA. Destino varia por pedido (San Salvador por defecto).
+const ORIGEN_RUTA = { lat: 25.7617, lng: -80.1918, nombre: "Miami, USA" };
+function fnDestinoPedido(destino) {
+  const d = String(destino || "San Salvador").toLowerCase();
+  if (d.includes("mexico") || d.includes("cdmx")) return { lat: 19.4326, lng: -99.1332, nombre: "Ciudad de Mexico" };
+  if (d.includes("guatemala")) return { lat: 14.6349, lng: -90.5069, nombre: "Guatemala" };
+  if (d.includes("honduras") || d.includes("tegucigalpa")) return { lat: 14.0723, lng: -87.1921, nombre: "Tegucigalpa" };
+  if (d.includes("nicaragua") || d.includes("managua")) return { lat: 12.1364, lng: -86.2514, nombre: "Managua" };
+  if (d.includes("costa rica") || d.includes("san jose")) return { lat: 9.9281, lng: -84.0907, nombre: "San Jose" };
+  if (d.includes("panama")) return { lat: 8.9824, lng: -79.5199, nombre: "Panama" };
+  return { lat: 13.6929, lng: -89.2182, nombre: "San Salvador" };
+}
+function fnPosCamion(origen, destino, progreso) {
+  const t = Math.min(0.98, Math.max(0.02, Number(progreso || 0) / 100));
+  return { lat: origen.lat + (destino.lat - origen.lat) * t, lng: origen.lng + (destino.lng - origen.lng) * t };
+}
+// Traza ruta rapido en zoom y luego se aleja al conectar con el destino.
+function RutaAnimada({ origen, destino, progreso, modo, relieve3d }) {
+  const mapa = useMap();
+  const rutaRef = React.useRef(null);
+  const lineaRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!mapa || !window.google) return;
+    if (!rutaRef.current) {
+      rutaRef.current = new window.google.maps.Polyline({
+        path: [origen, destino],
+        geodesic: true,
+        strokeColor: "#00E5FF",
+        strokeOpacity: 0.95,
+        strokeWeight: 4,
+      });
+      rutaRef.current.setMap(mapa);
+    } else {
+      rutaRef.current.setPath([origen, destino]);
+    }
+    if (!lineaRef.current) {
+      lineaRef.current = new window.google.maps.Polyline({
+        path: [origen, fnPosCamion(origen, destino, progreso)],
+        geodesic: true,
+        strokeColor: "#39FF6A",
+        strokeOpacity: 1,
+        strokeWeight: 5,
+      });
+      lineaRef.current.setMap(mapa);
+    } else {
+      lineaRef.current.setPath([origen, fnPosCamion(origen, destino, progreso)]);
+    }
+    return () => {};
+  }, [mapa, origen.lat, origen.lng, destino.lat, destino.lng, progreso]);
+  // Secuencia cine: zoom rapido al origen -> panea al camion -> zoom-out para ver ruta completa.
+  React.useEffect(() => {
+    if (!mapa) return;
+    const inclinar3d = relieve3d !== false && modo === "satellite";
+    mapa.setTilt(inclinar3d ? 45 : 0);
+    try {
+      mapa.setHeading(inclinar3d ? 25 : 0);
+    } catch {}
+    const timers = [];
+    // 1) Zoom rapido al origen
+    try { mapa.setZoom(11); mapa.panTo(origen); } catch {}
+    // 2) Conectar con el camion (punto intermedio en movimiento)
+    timers.push(setTimeout(() => {
+      try {
+        mapa.panTo(fnPosCamion(origen, destino, progreso));
+        mapa.setZoom(7);
+      } catch {}
+    }, 900));
+    // 3) Alejarse para ver origen + destino juntos
+    timers.push(setTimeout(() => {
+      try {
+        const bounds = new window.google.maps.LatLngBounds();
+        bounds.extend(origen);
+        bounds.extend(destino);
+        mapa.fitBounds(bounds, 60);
+      } catch {}
+    }, 2200));
+    return () => timers.forEach(clearTimeout);
+  }, [mapa, modo, relieve3d, pedidoKey(origen, destino)]);
+  return null;
+}
+function pedidoKey(origen, destino) {
+  return `${origen.lat},${origen.lng}-${destino.lat},${destino.lng}`;
+}
 function fnFotoVariada(grupo, id) {
   const lista = FOTOS_CATALOGO[grupo] || [IMAGEN_POR_DEFECTO];
   return lista[Number(id || 0) % lista.length];
@@ -841,10 +933,6 @@ function App() {
     localStorage.setItem("ie_idioma", nuevoIdioma);
     document.documentElement.lang = nuevoIdioma;
   }
-  {
-    vista === "seguimiento" && <SeguimientoInteractivo pedidos={pedidos} />;
-  }
-
   const usuarioActivo = usuario || {
     id: 1,
     nombre: "María",
@@ -962,7 +1050,7 @@ function App() {
             />
           )}
           {vista === "pedidos" && <Pedidos pedidos={pedidos} ir={setVista} />}
-          {vista === "seguimiento" && <Seguimiento pedidos={pedidos} />}
+          {vista === "seguimiento" && <SeguimientoInteractivo pedidos={pedidos} />}
           {vista === "perfil" && (
             <Perfil
               usuario={usuarioActivo}
@@ -1789,6 +1877,155 @@ function SeguimientoInteractivo({ pedidos }) {
     destino: "San Salvador",
     envio: "Express",
   };
+  return <MapaGoogle pedido={pedido} pedidoReal={pedidoReal} />;
+}
+
+function MapaGoogle({ pedido, pedidoReal }) {
+  const origen = ORIGEN_RUTA;
+  const destino = fnDestinoPedido(pedido.destino);
+  const camion = fnPosCamion(origen, destino, pedido.progreso);
+  const [modo, setModo] = useState("roadmap");
+  const [trafico, setTrafico] = useState(true);
+  const [relieve3d, setRelieve3d] = useState(true);
+  const [replay, setReplay] = useState(0);
+  const centroMedio = {
+    lat: (origen.lat + destino.lat) / 2,
+    lng: (origen.lng + destino.lng) / 2,
+  };
+  if (!GOOGLE_MAPS_API_KEY) {
+    return <MapaRespaldo pedido={pedido} pedidoReal={pedidoReal} />;
+  }
+  return (
+    <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+      <>
+        <div className="page-heading">
+          <div>
+            <p className="eyebrow">SEGUIMIENTO EN TIEMPO REAL</p>
+            <h1>Ubicacion del paquete</h1>
+            <p className="muted">
+              Google Maps: zoom rapido al origen, conecta con el camion y se
+              aleja a la ruta completa.
+            </p>
+          </div>
+          <span className="date-chip">
+            <i className="live-dot" /> POSICION ACTUALIZADA
+          </span>
+        </div>
+        <div className="tracking-layout">
+          <div className="panel map-panel map-interactive">
+            <div className="map-toolbar map-toolbar-google">
+              <div className="map-modes">
+                <button
+                  className={modo === "roadmap" ? "map-active" : ""}
+                  onClick={() => setModo("roadmap")}
+                >
+                  Estandar
+                </button>
+                <button
+                  className={modo === "satellite" ? "map-active" : ""}
+                  onClick={() => setModo("satellite")}
+                >
+                  Satelite
+                </button>
+                <button
+                  className={modo === "terrain" ? "map-active" : ""}
+                  onClick={() => setModo("terrain")}
+                >
+                  Relieve
+                </button>
+              </div>
+              <button
+                className={trafico ? "map-active" : ""}
+                onClick={() => setTrafico((v) => !v)}
+              >
+                Trafico {trafico ? "ON" : "OFF"}
+              </button>
+              <button
+                className={relieve3d ? "map-active" : ""}
+                onClick={() => setRelieve3d((v) => !v)}
+              >
+                3D {relieve3d ? "ON" : "OFF"}
+              </button>
+              <button onClick={() => setReplay((r) => r + 1)}>
+                Repetir vuelo
+              </button>
+            </div>
+            <Map
+              key={`${pedido.id}-${replay}`}
+              mapId={MAP_ID_DEMO}
+              defaultCenter={centroMedio}
+              defaultZoom={5}
+              mapTypeId={modo}
+              gestureHandling="greedy"
+              className="real-map"
+            >
+              <CapaTrafico activa={trafico} />
+              <RutaAnimada
+                origen={origen}
+                destino={destino}
+                progreso={pedido.progreso}
+                modo={modo}
+                relieve3d={relieve3d}
+              />
+              <AdvancedMarker position={origen} title={origen.nombre}>
+                <Pin background="#00E5FF" borderColor="#062b36" glyphColor="#062b36" />
+              </AdvancedMarker>
+              <AdvancedMarker position={destino} title={destino.nombre}>
+                <Pin background="#39FF6A" borderColor="#062b36" glyphColor="#062b36" />
+              </AdvancedMarker>
+              <AdvancedMarker position={camion} title={`Camion ${pedido.progreso}%`}>
+                <div className="truck-marker">Camion {pedido.progreso}%</div>
+              </AdvancedMarker>
+            </Map>
+            <div className="map-status">
+              <Package size={15} />{" "}
+              {pedidoReal
+                ? `Paquete ${pedido.progreso}% en ruta`
+                : "Vista de previsualizacion"}{" "}
+              · Origen: {origen.nombre} · Destino: {destino.nombre}
+            </div>
+        </div>
+        <aside className="panel tracking-summary">
+          <p className="eyebrow">
+            {pedidoReal ? "PEDIDO SELECCIONADO" : "VISTA DE PREVISUALIZACION"}
+          </p>
+          <h2>{pedido.id}</h2>
+          <span className={`status ${pedido.estado}`}>
+            {pedido.estado.replace("_", " ")}
+          </span>
+          <div className="big-progress">{pedido.progreso}%</div>
+          <p className="muted">Actualizacion por WebSocket activa</p>
+          <div className="timeline">
+            <span className="done">Pedido creado</span>
+            <span className={pedido.progreso > 25 ? "done" : ""}>
+              Salida de Estados Unidos
+            </span>
+            <span className={pedido.progreso > 60 ? "done" : ""}>
+              En transito
+            </span>
+            <span className={pedido.progreso >= 100 ? "done" : ""}>
+              Entregado
+            </span>
+          </div>
+        </aside>
+      </div>
+      </>
+    </APIProvider>
+  );
+}
+
+function CapaTrafico({ activa }) {
+  const mapa = useMap();
+  React.useEffect(() => {
+    if (!mapa || !window.google) return;
+    const capa = new window.google.maps.TrafficLayer();
+    if (activa) capa.setMap(mapa);
+    return () => capa.setMap(null);
+  }, [mapa, activa]);
+  return null;
+}
+
+function MapaRespaldo({ pedido, pedidoReal }) {
   const [zoom, setZoom] = useState(5);
   const [recargar, setRecargar] = useState(0);
   const mapa =
@@ -1800,11 +2037,11 @@ function SeguimientoInteractivo({ pedidos }) {
           <p className="eyebrow">SEGUIMIENTO EN TIEMPO REAL</p>
           <h1>Ubicacion del paquete</h1>
           <p className="muted">
-            Mapa interactivo de la ruta estimada desde Estados Unidos.
+            Sin clave Google Maps: usa mapa de respaldo OpenStreetMap.
           </p>
         </div>
         <span className="date-chip">
-          <i className="live-dot" /> POSICION ACTUALIZADA
+          <i className="live-dot" /> MODO DEMO SIN KEY
         </span>
       </div>
       <div className="tracking-layout">
@@ -1836,7 +2073,7 @@ function SeguimientoInteractivo({ pedidos }) {
             {pedidoReal
               ? `Paquete ${pedido.progreso}% en ruta`
               : "Vista de previsualizacion"}{" "}
-            · Origen: Estados Unidos · Destino: {pedido.destino}
+            · Origen: {ORIGEN_RUTA.nombre} · Destino: {fnDestinoPedido(pedido.destino).nombre}
           </div>
         </div>
         <aside className="panel tracking-summary">

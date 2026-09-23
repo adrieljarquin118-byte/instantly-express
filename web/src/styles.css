@@ -1522,6 +1522,56 @@ header {
   color: var(--muted);
   font-size: 12px;
 }
+.map-toolbar-google {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  right: auto;
+  max-width: calc(100% - 28px);
+}
+.map-modes {
+  display: flex;
+  gap: 6px;
+  background: #0b0e14e8;
+  padding: 4px;
+  border-radius: 7px;
+}
+.map-modes button {
+  border-color: transparent;
+  background: transparent;
+}
+.map-toolbar button.map-active {
+  background: var(--cyan);
+  color: #04131a;
+  border-color: var(--cyan);
+  font-weight: 700;
+}
+.truck-marker {
+  background: #ffd166;
+  color: #18242b;
+  border: 2px solid #b8860b;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px #00000059;
+}
+.tema-claro .map-toolbar button {
+  background: #fffffff0;
+  color: #0b0e14;
+  border-color: #0b0e14;
+}
+.tema-claro .map-modes {
+  background: #fffffff0;
+}
+.tema-claro .map-toolbar button.map-active {
+  background: #0b0e14;
+  color: var(--cyan);
+}
+.tema-claro .map-status {
+  background: #fff;
+  color: #47535a;
+}
 .icon-box {
   display: inline-flex;
   align-items: center;
