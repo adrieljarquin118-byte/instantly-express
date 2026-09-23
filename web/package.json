@@ -2,8 +2,24 @@
   "name": "instantly-express-web",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview", "start": "vite preview" },
-  "engines": { "node": "22.x" },
-  "dependencies": { "@vitejs/plugin-react": "^5.0.0", "axios": "^1.13.2", "socket.io-client": "^4.8.3", "vite": "^7.2.6", "react": "^19.2.0", "react-dom": "^19.2.0", "lucide-react": "^0.550.0", "jspdf": "^4.0.0" },
-  "devDependencies": {}
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "vite preview"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "axios": "^1.13.2",
+    "jspdf": "^4.0.0",
+    "jspdf-autotable": "^5.0.8",
+    "lucide-react": "^0.550.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "socket.io-client": "^4.8.3",
+    "vite": "^7.2.6"
+  }
 }

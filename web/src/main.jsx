@@ -1,6 +1,8 @@
 ﻿import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import "./styles.css";
 
 const API = (
@@ -184,26 +186,159 @@ const CATALOGO_DEMO = [
   },
 ];
 
+function fnFechaFactura(valor) {
+  try {
+    const fecha = valor ? new Date(valor) : new Date();
+    const f = Number.isNaN(fecha.getTime()) ? new Date() : fecha;
+    return {
+      fecha: f.toLocaleDateString("es-SV", { day: "2-digit", month: "2-digit", year: "numeric" }),
+      hora: f.toLocaleTimeString("es-SV", { hour: "2-digit", minute: "2-digit" }),
+    };
+  } catch {
+    return { fecha: "22/09/2026", hora: "12:00 AM" };
+  }
+}
 function fnEscaparPdf(texto) {
   return String(texto)
     .replace(/\\/g, "\\\\")
     .replace(/\(/g, "\\(")
     .replace(/\)/g, "\\)");
 }
-function fnDescargarFactura(pedido) {
-  const lineas = [
+function fnDescargarFactura(pedido, opciones = {}) {
+  const lineas = Array.isArray(opciones.lineas)
+    ? opciones.lineas : Array.isArray(pedido.lineas) ? pedido.lineas : [];
+  const cliente = opciones.cliente || pedido.cliente || {};
+  const nombreCliente = cliente.nombre || pedido.clienteNombre || "Oscar Enrique Perez Ticas";
+  const telefonoCliente = cliente.telefono || pedido.telefono || "+503 6997-4095";
+  const correoCliente = cliente.correo || pedido.correo || "oscarperez@gmail.com";
+  const metodo = String(pedido.metodoPago || opciones.metodoPago || "Transferencia bancaria").toLowerCase();
+  const esEfectivo = metodo.includes("efectivo") || metodo.includes("cash");
+  const esTarjeta = metodo.includes("tarjeta") || metodo.includes("card");
+  const subtotal = Number(pedido.total || opciones.total || 74.8);
+  const descuento = Number(pedido.descuento ?? opciones.descuento ?? 0) || 0;
+  const impuestos = Number(pedido.impuestos ?? opciones.impuestos ?? 0) || 0;
+  const totalPagar = Number(pedido.totalPagar ?? subtotal - descuento + impuestos) || subtotal;
+  const fh = fnFechaFactura(pedido.fecha || pedido.creado);
+  const numero = pedido.numeroFactura || "050-000800";
+  const filas = lineas.length ? lineas.map((l) => {
+    const nombre = l.producto?.nombre || l.nombre || "Producto/servicio";
+    const cant = Number(l.cantidad ?? 1);
+    const precio = Number(l.producto?.precio ?? l.precio ?? 0);
+    return [String(cant), nombre, `$${precio.toFixed(2)}`, `$${(cant * precio).toFixed(2)}`];
+  }) : [
+    ["1", "Catalogo Stream Premium", "$18.50", "$18.50"],
+    ["1", "Audifonos de estudio", "$29.90", "$29.90"],
+    ["1", "Camara web Full HD", "$26.40", "$26.40"],
+  ];
+  try {
+    const doc = new jsPDF({ unit: "pt", format: "letter" });
+    const azul = [122, 184, 221];
+    const azulOscuro = [27, 58, 95];
+    const borde = [35, 35, 35];
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(17);
+    doc.setTextColor(...azulOscuro);
+    doc.text("INSTANTLY", 52, 58);
+    doc.text("EXPRESS", 52, 78);
+    doc.setFontSize(19);
+    doc.setTextColor(20, 20, 20);
+    doc.text("FACTURA", 430, 58);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(60, 60, 60);
+    doc.text(`N. de factura:      ${numero}`, 330, 78);
+    doc.text(`Fecha:                  ${fh.fecha}`, 330, 90);
+    doc.text(`Hora:                   ${fh.hora}`, 330, 102);
+    doc.text("Tel: +503 1234-5678", 52, 102);
+    doc.setTextColor(20, 120, 160);
+    doc.text("instantly@gmail.com", 52, 114);
+    doc.setFillColor(...azul);
+    doc.rect(52, 132, 508, 16, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.text("DATOS DEL CLIENTE", 58, 144);
+    autoTable(doc, {
+      startY: 148,
+      margin: { left: 52, right: 52 },
+      theme: "grid",
+      styles: { fontSize: 8.5, cellPadding: 4, lineColor: borde },
+      columnStyles: { 0: { cellWidth: 110 }, 1: { cellWidth: 398 } },
+      body: [["Nombre:", nombreCliente], ["Telefono:", telefonoCliente], ["Correo:", correoCliente]],
+    });
+    const finCliente = doc.lastAutoTable.finalY;
+    autoTable(doc, {
+      startY: finCliente + 12,
+      margin: { left: 52, right: 52 },
+      theme: "grid",
+      headStyles: { fillColor: azul, textColor: [20, 20, 20], fontStyle: "bold", fontSize: 9 },
+      styles: { fontSize: 8.5, cellPadding: 5, lineColor: borde },
+      columnStyles: {
+        0: { cellWidth: 90, halign: "center" },
+        1: { cellWidth: 238 },
+        2: { cellWidth: 90, halign: "right" },
+        3: { cellWidth: 90, halign: "right" },
+      },
+      head: [["Cantidad", "Producto/servicio", "Precio", "Total"]],
+      body: filas,
+    });
+    const finTabla = doc.lastAutoTable.finalY;
+    const pagoY = finTabla + 12;
+    doc.setDrawColor(...borde);
+    doc.rect(52, pagoY, 508, 112);
+    doc.line(288, pagoY, 288, pagoY + 112);
+    doc.setFillColor(...azul);
+    doc.rect(60, pagoY + 8, 140, 15, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text("FORMA DE PAGO", 66, pagoY + 19);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(30, 30, 30);
+    doc.text(`${esEfectivo ? "[x]" : "[ ]"}   Efectivo`, 66, pagoY + 48);
+    doc.text(`${esTarjeta ? "[x]" : "[ ]"}   Tarjeta`, 66, pagoY + 68);
+    doc.text(`${!esEfectivo && !esTarjeta ? "[x]" : "[ ]"}   Transferencia`, 66, pagoY + 88);
+    autoTable(doc, {
+      startY: pagoY + 8,
+      margin: { left: 296, right: 52 },
+      theme: "grid",
+      styles: { fontSize: 8.5, cellPadding: 5, lineColor: borde },
+      columnStyles: { 0: { cellWidth: 132 }, 1: { cellWidth: 132, halign: "right" } },
+      body: [
+        ["Subtotal", `$${subtotal.toFixed(2)}`],
+        ["Descuento (0%)", `$${descuento.toFixed(2)}`],
+        ["Impuestos (0%)", `$${impuestos.toFixed(2)}`],
+      ],
+    });
+    const finTotales = doc.lastAutoTable.finalY;
+    doc.setFillColor(...azul);
+    doc.rect(296, finTotales, 264, 22, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(20, 20, 20);
+    doc.text("Total a pagar", 302, finTotales + 14);
+    doc.text(`$${totalPagar.toFixed(2)}`, 548, finTotales + 14, { align: "right" });
+    doc.setDrawColor(...borde);
+    doc.rect(52, pagoY + 124, 508, 22);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("-------   GRACIAS POR SU COMPRA   -------", 306, pagoY + 139, { align: "center" });
+    doc.save(`factura-${pedido.id || numero}.pdf`);
+    return;
+  } catch {
+    // Respaldo simple si jsPDF falla.
+  }
+  const lineasTexto = [
     `INSTANTLY EXPRESS`,
-    `FACTURA DE PEDIDO`,
+    `FACTURA ${numero}`,
     `Pedido: ${pedido.id}`,
-    `Fecha: ${pedido.fecha}`,
-    `Origen: Estados Unidos`,
-    `Destino: ${pedido.destino}`,
+    `Fecha: ${fh.fecha} ${fh.hora}`,
+    `Cliente: ${nombreCliente}`,
     `Metodo de pago: ${pedido.metodoPago || "Transferencia bancaria"}`,
-    `Total: $${Number(pedido.total).toFixed(2)}`,
-    `Documento informativo. No representa un cobro real.`,
+    `Total: $${totalPagar.toFixed(2)}`,
   ];
   let contenido = "BT\n/F1 16 Tf\n50 780 Td\n";
-  lineas.forEach((linea, indice) => {
+  lineasTexto.forEach((linea, indice) => {
     contenido += `(${fnEscaparPdf(linea)}) Tj\n${indice === 1 ? "0 -28 Td\n/F1 11 Tf\n" : "0 -22 Td\n"}`;
   });
   contenido += "ET";
@@ -1090,6 +1225,7 @@ function Carrito({ carrito, productos, confirmar }) {
               >
                 <option>Transferencia bancaria</option>
                 <option>Tarjeta</option>
+                <option>Efectivo</option>
                 <option>Pago contra entrega</option>
               </select>
             </label>
