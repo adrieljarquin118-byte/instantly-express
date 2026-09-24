@@ -135,7 +135,22 @@ function App() {
     const fecha = pedido?.fecha || new Date().toISOString().slice(0, 10);
     const total = Number(pedido?.total || 0).toFixed(2);
     const html = `<html><body style="font-family:Arial;padding:24px">
-      <h1 style="color:#1b3a5f">INSTANTLY EXPRESS</h1>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+        <svg width="76" height="60" viewBox="0 0 120 92" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6" y="10" width="18" height="6" rx="3" fill="#1b3a5f"/>
+          <rect x="6" y="22" width="26" height="6" rx="3" fill="#1b3a5f"/>
+          <rect x="6" y="34" width="14" height="6" rx="3" fill="#1b3a5f"/>
+          <rect x="30" y="18" width="52" height="40" rx="4" fill="#1b3a5f"/>
+          <text x="56" y="48" font-family="Arial" font-size="26" font-weight="bold" fill="#ffffff" text-anchor="middle">IE</text>
+          <polygon points="82,26 104,26 112,44 112,58 82,58" fill="#1b3a5f"/>
+          <rect x="86" y="30" width="12" height="12" fill="#ffffff"/>
+          <circle cx="46" cy="64" r="9" fill="#1b3a5f"/><circle cx="46" cy="64" r="4" fill="#ffffff"/>
+          <circle cx="96" cy="64" r="9" fill="#1b3a5f"/><circle cx="96" cy="64" r="4" fill="#ffffff"/>
+          <rect x="28" y="72" width="86" height="4" rx="2" fill="#1b3a5f"/>
+        </svg>
+        <div><h1 style="color:#1b3a5f;margin:0">INSTANTLY EXPRESS</h1>
+        <p style="margin:2px 0;color:#555">instantly@gmail.com · Tel: +503 1234-5678</p></div>
+      </div>
       <h2>FACTURA ${pedido?.id || ""}</h2>
       <p><b>Cliente:</b> ${nombre}<br/><b>Correo:</b> ${correo}<br/><b>Fecha:</b> ${fecha}<br/><b>Metodo:</b> ${pedido?.metodoPago || "Efectivo"}</p>
       <p><b>Total a pagar: $${total}</b></p>

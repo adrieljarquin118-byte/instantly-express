@@ -611,7 +611,27 @@ function fnEscaparPdf(texto) {
     .replace(/\(/g, "\\(")
     .replace(/\)/g, "\\)");
 }
-function fnDescargarFactura(pedido, opciones = {}, usuarioFactura = null) {
+let cacheLogoFactura = null;
+function fnLogoFactura() {
+  if (cacheLogoFactura) return cacheLogoFactura;
+  cacheLogoFactura = fetch(logo)
+    .then((r) => {
+      if (!r.ok) throw new Error("sin logo");
+      return r.blob();
+    })
+    .then(
+      (blob) =>
+        new Promise((resolver) => {
+          const lector = new FileReader();
+          lector.onload = () => resolver(lector.result);
+          lector.onerror = () => resolver(null);
+          lector.readAsDataURL(blob);
+        }),
+    )
+    .catch(() => null);
+  return cacheLogoFactura;
+}
+async function fnDescargarFactura(pedido, opciones = {}, usuarioFactura = null) {
   const lineas = Array.isArray(opciones.lineas)
     ? opciones.lineas : Array.isArray(pedido.lineas) ? pedido.lineas : [];
   const cliente = opciones.cliente || pedido.cliente || usuarioFactura || {};
@@ -643,11 +663,17 @@ function fnDescargarFactura(pedido, opciones = {}, usuarioFactura = null) {
     const azul = [122, 184, 221];
     const azulOscuro = [27, 58, 95];
     const borde = [35, 35, 35];
+    try {
+      const imagenLogo = await fnLogoFactura();
+      if (imagenLogo) doc.addImage(imagenLogo, "PNG", 52, 30, 62, 52);
+    } catch {
+      // Si el logo no carga, se mantiene el encabezado de texto.
+    }
     doc.setFont("helvetica", "bold");
     doc.setFontSize(17);
     doc.setTextColor(...azulOscuro);
-    doc.text("INSTANTLY", 52, 58);
-    doc.text("EXPRESS", 52, 78);
+    doc.text("INSTANTLY", 126, 58);
+    doc.text("EXPRESS", 126, 78);
     doc.setFontSize(19);
     doc.setTextColor(20, 20, 20);
     doc.text("FACTURA", 430, 58);
@@ -657,9 +683,9 @@ function fnDescargarFactura(pedido, opciones = {}, usuarioFactura = null) {
     doc.text(`N. de factura:      ${numero}`, 330, 78);
     doc.text(`Fecha:                  ${fh.fecha}`, 330, 90);
     doc.text(`Hora:                   ${fh.hora}`, 330, 102);
-    doc.text("Tel: +503 1234-5678", 52, 102);
+    doc.text("Tel: +503 1234-5678", 126, 102);
     doc.setTextColor(20, 120, 160);
-    doc.text("instantly@gmail.com", 52, 114);
+    doc.text("instantly@gmail.com", 126, 114);
     doc.setFillColor(...azul);
     doc.rect(52, 132, 508, 16, "F");
     doc.setTextColor(255, 255, 255);
