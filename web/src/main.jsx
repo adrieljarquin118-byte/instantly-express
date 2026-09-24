@@ -2070,6 +2070,11 @@ function MapaConGoogle({ pedido, pedidoReal }) {
   );
   const camion = fnPuntoGeodesico(origen, destino, avance);
   const trazado = Math.round(avance * 100);
+  // El numero grande se mueve con el camion: en demo cuenta 0->100,
+  // con pedido real cuenta 0->progreso del backend al ritmo del trazo.
+  const progresoMostrado = pedidoReal
+    ? Math.round((Number(pedido.progreso) || 0) * avance)
+    : trazado;
   const centroMedio = {
     lat: (origen.lat + destino.lat) / 2,
     lng: (origen.lng + destino.lng) / 2,
@@ -2169,7 +2174,7 @@ function MapaConGoogle({ pedido, pedidoReal }) {
             <div className="map-status">
               <Package size={15} />{" "}
               {pedidoReal
-                ? `Paquete ${pedido.progreso}% en ruta`
+                ? `Paquete ${progresoMostrado}% en ruta`
                 : "Vista de previsualizacion"}{" "}
               · Trazo A → B {trazado}% · Origen: {origen.nombre} · Destino:{" "}
               {destino.nombre}
@@ -2183,17 +2188,17 @@ function MapaConGoogle({ pedido, pedidoReal }) {
           <span className={`status ${pedido.estado}`}>
             {pedido.estado.replace("_", " ")}
           </span>
-          <div className="big-progress">{pedido.progreso}%</div>
+          <div className="big-progress">{progresoMostrado}%</div>
           <p className="muted">Actualizacion por WebSocket activa</p>
           <div className="timeline">
             <span className="done">Pedido creado</span>
-            <span className={pedido.progreso > 25 ? "done" : ""}>
+            <span className={progresoMostrado > 25 ? "done" : ""}>
               Salida de Estados Unidos
             </span>
-            <span className={pedido.progreso > 60 ? "done" : ""}>
+            <span className={progresoMostrado > 60 ? "done" : ""}>
               En transito
             </span>
-            <span className={pedido.progreso >= 100 ? "done" : ""}>
+            <span className={progresoMostrado >= 100 ? "done" : ""}>
               Entregado
             </span>
           </div>
@@ -2334,6 +2339,10 @@ function MapaRespaldo({ pedido, pedidoReal }) {
   const largo = fnLargoTrazo(vista.proyectados);
   const camion = fnPuntoEnTrazo(vista.proyectados, avance, largo);
   const trazado = Math.round(avance * 100);
+  // Igual que en Google: el numero grande cuenta con el camion.
+  const progresoMostrado = pedidoReal
+    ? Math.round((Number(pedido.progreso) || 0) * avance)
+    : trazado;
   const inicio = vista.proyectados[0];
   const fin = vista.proyectados[vista.proyectados.length - 1];
   const etiquetaCamion =
@@ -2459,7 +2468,7 @@ function MapaRespaldo({ pedido, pedidoReal }) {
           <div className="map-status">
             <Package size={15} />{" "}
             {pedidoReal
-              ? `Paquete ${pedido.progreso}% en ruta`
+              ? `Paquete ${progresoMostrado}% en ruta`
               : "Vista de previsualizacion"}{" "}
             · Trazo A → B {trazado}% · Origen: {origen.nombre} · Destino:{" "}
             {destino.nombre}
@@ -2473,17 +2482,17 @@ function MapaRespaldo({ pedido, pedidoReal }) {
           <span className={`status ${pedido.estado}`}>
             {pedido.estado.replace("_", " ")}
           </span>
-          <div className="big-progress">{pedido.progreso}%</div>
+          <div className="big-progress">{progresoMostrado}%</div>
           <p className="muted">Actualizacion por WebSocket activa</p>
           <div className="timeline">
             <span className="done">Pedido creado</span>
-            <span className={pedido.progreso > 25 ? "done" : ""}>
+            <span className={progresoMostrado > 25 ? "done" : ""}>
               Salida de Estados Unidos
             </span>
-            <span className={pedido.progreso > 60 ? "done" : ""}>
+            <span className={progresoMostrado > 60 ? "done" : ""}>
               En transito
             </span>
-            <span className={pedido.progreso >= 100 ? "done" : ""}>
+            <span className={progresoMostrado >= 100 ? "done" : ""}>
               Entregado
             </span>
           </div>
