@@ -1718,7 +1718,23 @@ function Carrito({ carrito, productos, confirmar }) {
     </>
   );
 }
+const filtrosPedidos = [
+  { id: "todos", texto: "Todos", estados: null },
+  {
+    id: "proceso",
+    texto: "En proceso",
+    estados: ["pendiente", "confirmado", "en_transito"],
+  },
+  { id: "entregados", texto: "Entregados", estados: ["entregado"] },
+];
+function fnFiltrarPedidos(pedidos, filtro) {
+  const opcion = filtrosPedidos.find((item) => item.id === filtro);
+  if (!opcion || !opcion.estados) return pedidos;
+  return pedidos.filter((pedido) => opcion.estados.includes(pedido.estado));
+}
 function Pedidos({ pedidos, ir }) {
+  const [filtro, setFiltro] = useState("todos");
+  const visibles = fnFiltrarPedidos(pedidos, filtro);
   return (
     <>
       <div className="page-heading">
@@ -1731,20 +1747,47 @@ function Pedidos({ pedidos, ir }) {
           Ver seguimiento
         </button>
       </div>
-      <div className="history-tabs">
-        <button className="filter-active">Todos</button>
-        <button>En proceso</button>
-        <button>Entregados</button>
+      <div className="history-tabs" role="tablist" aria-label="Filtrar pedidos">
+        {filtrosPedidos.map((opcion) => {
+          const activo = filtro === opcion.id;
+          return (
+            <button
+              type="button"
+              role="tab"
+              key={opcion.id}
+              aria-selected={activo}
+              className={activo ? "filter-active" : ""}
+              onClick={() => setFiltro(opcion.id)}
+            >
+              {opcion.texto}
+              <span className="history-tab-count">
+                {fnFiltrarPedidos(pedidos, opcion.id).length}
+              </span>
+            </button>
+          );
+        })}
       </div>
-      <div className="orders-list">
-        {pedidos.map((pedido) => (
+      {!visibles.length ? (
+        <div className="empty panel orders-empty">
+          <span>+</span>
+          <h2>Sin pedidos en este filtro</h2>
+          <p className="muted">
+            Cambia de filtro o agrega referencias desde el catalogo.
+          </p>
+          <button className="primary" onClick={() => ir("catalogo")}>
+            Ir al catalogo
+          </button>
+        </div>
+      ) : (
+        <div className="orders-list">
+          {visibles.map((pedido) => (
           <article className="panel order-card" key={pedido.id}>
             <div className="order-icon">IE</div>
             <div className="order-main">
               <div>
                 <strong>{pedido.id}</strong>
                 <span className={`status ${pedido.estado}`}>
-                  {pedido.estado.replace("_", " ")}
+                  {pedido.estado.replace(/_/g, " ")}
                 </span>
               </div>
               <p>
@@ -1766,8 +1809,9 @@ function Pedidos({ pedidos, ir }) {
               <span>{pedido.progreso}% recorrido</span>
             </div>
           </article>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
